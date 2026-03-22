@@ -1,0 +1,21 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<h1>
+	{% if user.email %}
+	Hello, {{ user.email }}
+	{% else %}
+	Hello, anon
+	{%endif %}
+</h1>
+
+<p>Things you can do:</p>
+
+<ul>
+    <li><a href="{{ url_for('index') }}">/</a></li>
+    <li><a href="{{ url_for('security.login') }}">/login</a></li>
+    <li><a href="{{ url_for('security.logout') }}">/logout</a></li>
+    <li><a href="{{ url_for('google_login') }}">/login/google</a></li>
+</ul>
+
+{% endblock %}
