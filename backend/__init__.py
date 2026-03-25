@@ -21,7 +21,7 @@ from flask_security import (
 )
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from backendlearnify.model import OAuth2Token, Role, User, db
+from backend.model import OAuth2Token, Role, User, db
 
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
@@ -35,13 +35,13 @@ app = Flask(__name__)
 
 @app.cli.command()
 def version() -> None:
-    """Print the current version of backend-learnify.
+    """Print the current version of backend.
 
     :return: None
 
     """
-    _version = importlib.metadata.version("backend-learnify")
-    print(f"backend-learnify v{{_version}}")
+    _version = importlib.metadata.version("backend")
+    print(f"backend v{{_version}}")
 
 
 def authlib_token_update(
@@ -316,6 +316,8 @@ def healthz():
     """
     return jsonify(
         {
-            "version": importlib.metadata.version("backend-learnify"),
+            "version": importlib.metadata.version("backend"),
+            "mensaje": "El servidor esta funcionando correctamente",
+            "active": True
         }
     )

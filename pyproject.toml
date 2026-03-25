@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "backend-learnify"
+name = "backend"
 version = "0.3.2"
 description = "A 'hello world' style Flask web server application that applies good practices."
 readme = "README.md"
@@ -32,7 +32,7 @@ dependencies = [
 ]
 
 [project.scripts]
-backend-learnify-worker = "backendlearnify.worker:main"
+backend-worker = "backendlearnify.worker:main"
 
 [dependency-groups]
 dev = [
@@ -48,7 +48,7 @@ dev = [
 ignore_missing_imports = true
 
 [tool.setuptools]
-packages = ["backend-learnify"]
+packages = ["backend"]
 
 [tool.ruff]
 line-length = 120

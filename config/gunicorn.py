@@ -2,7 +2,7 @@
 
 from configobj import ConfigObj
 
-from backendlearnify import init_webapp
+from backend import init_webapp
 
 configobj_path = 'config/dev.config'
 configobj = ConfigObj(configobj_path, configspec=f"{configobj_path}spec")

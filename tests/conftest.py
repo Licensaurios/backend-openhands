@@ -2,7 +2,7 @@ import pytest
 from flask import Flask
 from pytest_flask.fixtures import client
 
-from backendlearnify import init_webapp
+from backend import init_webapp
 
 assert client
 

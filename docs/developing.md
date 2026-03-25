@@ -56,5 +56,5 @@ Start the background worker process, which uses APScheduler to run
 scheduled jobs.
 
 ```bash
-backend-learnify-worker -c config/dev.config
+backend-worker -c config/dev.config
 ```

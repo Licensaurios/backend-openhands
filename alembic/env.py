@@ -13,13 +13,13 @@ config = context.config
 # basically.
 fileConfig(config.config_file_name)
 
-from backendlearnify.model import *
+from backend.model import *
 
 # add your model's MetaData object here
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-from backendlearnify.model import db
+from backend.model import db
 
 target_metadata = db.metadata
 

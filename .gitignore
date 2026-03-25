@@ -65,4 +65,4 @@ docs/_build/
 *.deb
 
 # Docker
-.backend-learnify-container-id
+.backend-container-id

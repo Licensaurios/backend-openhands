@@ -2,10 +2,10 @@
 echo "POSTINST!"
 
 # Create the required directories.
-mkdir -p /opt/backend-learnify/var/run/
-mkdir -p /opt/backend-learnify/var/log/
-mkdir -p /opt/backend-learnify/config/
+mkdir -p /opt/backend/var/run/
+mkdir -p /opt/backend/var/log/
+mkdir -p /opt/backend/config/
 
 # Install the unit file.
-cp /opt/backend-learnify/config/backend-learnify.init /etc/init.d/backend-learnify
-chmod 755 /etc/init.d/backend-learnify
+cp /opt/backend/config/backend.init /etc/init.d/backend
+chmod 755 /etc/init.d/backend
