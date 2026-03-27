@@ -37,7 +37,7 @@ uv sync
 * Activar entorno virtual bash
 
 ```bash
-source ./.venv/Scripts/activate
+source ./.venv/bin/activate
 ```
 
 * Ejecutar servidor
