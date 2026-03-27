@@ -13,13 +13,13 @@ config = context.config
 # basically.
 fileConfig(config.config_file_name)
 
-from backend.model import *
+from openhands_api.model import *
 
 # add your model's MetaData object here
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-from backend.model import db
+from openhands_api.model import db
 
 target_metadata = db.metadata
 

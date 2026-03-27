@@ -14,12 +14,12 @@ RUN apt-get --assume-yes install \
     python3-setuptools \
     python3-venv
 RUN pipx install uv
-WORKDIR /build/backend
-COPY uv.lock /build/backend
-COPY pyproject.toml README.md /build/backend/
-COPY debian /build/backend/debian
-COPY backendlearnify /build/backend/backendlearnify
-COPY config /build/backend/config
+WORKDIR /build/server
+COPY uv.lock /build/server
+COPY pyproject.toml README.md /build/server/
+COPY debian /build/server/debian
+COPY serverlearnify /build/server/serverlearnify
+COPY config /build/server/config
 RUN dpkg-buildpackage -us -uc -b
 
 # This builds a runnable development server.
@@ -30,5 +30,5 @@ RUN apt-get --assume-yes install \
     python3 \
     sudo
 COPY --from=builder /build/* /tmp
-RUN dpkg -i /tmp/backend_0.1-1_*.deb
-CMD service backend restart && tail -F /opt/backend/var/log/backend.log
+RUN dpkg -i /tmp/server_0.1-1_*.deb
+CMD service server restart && tail -F /opt/server/var/log/server.log

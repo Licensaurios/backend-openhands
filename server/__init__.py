@@ -7,7 +7,7 @@ import uuid
 import sqlalchemy
 from authlib.integrations.flask_client import OAuth
 from configobj import ConfigObj
-from flask import Flask, jsonify, redirect, render_template, url_for
+from flask import Flask, jsonify, redirect, url_for
 from flask_admin import Admin
 from flask_admin.contrib.sqla import ModelView
 from flask_bootstrap import Bootstrap
@@ -21,7 +21,7 @@ from flask_security import (
 )
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from backend.model import OAuth2Token, Role, User, db
+from server.model import OAuth2Token, Role, User, db
 
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
@@ -35,13 +35,13 @@ app = Flask(__name__)
 
 @app.cli.command()
 def version() -> None:
-    """Print the current version of backend.
+    """Print the current version of server.
 
     :return: None
 
     """
-    _version = importlib.metadata.version("backend")
-    print(f"backend v{{_version}}")
+    _version = importlib.metadata.version("server")
+    print(f"server v{{_version}}")
 
 
 def authlib_token_update(
@@ -285,12 +285,11 @@ def auth():
 
 @app.route("/")
 def index():
-    """
-    Render the landing page.
-
-    :return: Rendered HTML for the landing page.
-    """
-    return render_template("index.html", user=current_user)
+    return jsonify( 
+        {
+            "ok": True
+        }
+    )
 
 
 @app.route("/protected")
@@ -316,7 +315,7 @@ def healthz():
     """
     return jsonify(
         {
-            "version": importlib.metadata.version("backend"),
+            "version": importlib.metadata.version("server"),
             "mensaje": "El servidor esta funcionando correctamente",
             "active": True
         }

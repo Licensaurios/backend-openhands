@@ -34,7 +34,7 @@ def main():
     :raises SystemExit: If the configuration file cannot be loaded.
     """
 
-    parser = argparse.ArgumentParser(description="backend worker")
+    parser = argparse.ArgumentParser(description="server worker")
     parser.add_argument(
         "-c", "--config",
         default=os.path.join(os.path.dirname(__file__), "..", "config", "dev.config"),

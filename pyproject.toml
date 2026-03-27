@@ -1,9 +1,9 @@
 [build-system]
 requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+build-server = "setuptools.build_meta"
 
 [project]
-name = "backend"
+name = "server"
 version = "0.3.2"
 description = "A 'hello world' style Flask web server application that applies good practices."
 readme = "README.md"
@@ -32,7 +32,7 @@ dependencies = [
 ]
 
 [project.scripts]
-backend-worker = "backendlearnify.worker:main"
+server-worker = "serverlearnify.worker:main"
 
 [dependency-groups]
 dev = [
@@ -48,7 +48,7 @@ dev = [
 ignore_missing_imports = true
 
 [tool.setuptools]
-packages = ["backend"]
+packages = ["server"]
 
 [tool.ruff]
 line-length = 120

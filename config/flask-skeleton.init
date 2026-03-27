@@ -13,17 +13,17 @@
 # FIXME: Run as user.
 user="root"
 
-name="backend"
-pid_file="/opt/backend/var/run/$name.pid"
-stdout_log="/opt/backend/var/log/$name.log"
-stderr_log="/opt/backend/var/log/$name.err"
+name="server"
+pid_file="/opt/server/var/run/$name.pid"
+stdout_log="/opt/server/var/log/$name.log"
+stderr_log="/opt/server/var/log/$name.err"
 
 
 # Some of the gunicorn/configobj configuration depend on relative
 # paths, so set the working directory to look like development.
-dir="/opt/backend"
+dir="/opt/server"
 
-cmd="$dir/bin/gunicorn -p $dir/var/run/gunicorn.pid -c $dir/config/gunicorn.py backendlearnify:app"
+cmd="$dir/bin/gunicorn -p $dir/var/run/gunicorn.pid -c $dir/config/gunicorn.py serverlearnify:app"
 
 get_pid() {
     cat "$pid_file"
