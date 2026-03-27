@@ -2,7 +2,7 @@
 
 from configobj import ConfigObj
 
-from openhands_api import init_webapp
+from server import init_webapp
 
 configobj_path = 'config/dev.config'
 configobj = ConfigObj(configobj_path, configspec=f"{configobj_path}spec")
