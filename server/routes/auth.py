@@ -1,12 +1,12 @@
 
 from flask import (
-    Blueprint, jsonify
+    Blueprint, jsonify, request
 )
 
 
-from server.controllers.authentication import authorize_user
-
+from server.controllers.authentication import authorize_user, register_user, login_user
 auth_router = Blueprint('auth', __name__, url_prefix='/auth')
+
 
 
 @auth_router.route("/login/google")
@@ -79,4 +79,17 @@ def auth():
     #return redirect(url_for("index"))
 
 
+@auth_router.route("/register", methods=["POST"])
+def register():
+    data = request.get_json()
+    result = register_user(data)
+    return jsonify(result)
 
+@auth_router.route("/login", methods=["POST"]) # <--- Cambiado a POST
+def login():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No se enviaron datos"}), 400
+        
+    result, status_code = login_user(data)
+    return jsonify(result), status_code
