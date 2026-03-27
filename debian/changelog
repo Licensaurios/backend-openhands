@@ -1,4 +1,4 @@
-backend (0.1-1) unstable; urgency=low
+server (0.1-1) unstable; urgency=low
 
   [ Stephen Holsapple ]
   * Initial public release

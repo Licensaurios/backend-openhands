@@ -2,10 +2,10 @@
 echo "POSTINST!"
 
 # Create the required directories.
-mkdir -p /opt/backend/var/run/
-mkdir -p /opt/backend/var/log/
-mkdir -p /opt/backend/config/
+mkdir -p /opt/server/var/run/
+mkdir -p /opt/server/var/log/
+mkdir -p /opt/server/config/
 
 # Install the unit file.
-cp /opt/backend/config/backend.init /etc/init.d/backend
-chmod 755 /etc/init.d/backend
+cp /opt/server/config/server.init /etc/init.d/server
+chmod 755 /etc/init.d/server

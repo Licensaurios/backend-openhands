@@ -26,14 +26,14 @@ uv sync --group dev
 Start the Flask development web server on your local machine.
 
 ```bash
-FLASK_APP="backendlearnify:init_webapp('./config/dev.config')" flask run
+FLASK_APP="serverlearnify:init_webapp('./config/dev.config')" flask run
 ```
 
 Alternatively, start the gunicorn arbiter for a more production-like
 environment.
 
 ```bash
-gunicorn -c config/gunicorn.py -b 0.0.0.0:8080 backendlearnify:app
+gunicorn -c config/gunicorn.py -b 0.0.0.0:8080 serverlearnify:app
 ```
 
 Then, in your browser, navigate to [http://127.0.0.1:8080/](http://127.0.0.1:8080/).
@@ -56,5 +56,5 @@ Start the background worker process, which uses APScheduler to run
 scheduled jobs.
 
 ```bash
-backend-worker -c config/dev.config
+server-worker -c config/dev.config
 ```

@@ -65,4 +65,4 @@ docs/_build/
 *.deb
 
 # Docker
-.backend-container-id
+.server-container-id
