@@ -50,7 +50,7 @@ pytest-flask==1.3.0
 pytokens==0.4.1
 requests==2.32.5
 ruff==0.15.2
--e git+ssh://git@github.com/Licensaurios/backend-openhands.git@c86ce4bf39f78483e0acef5a9bf58527669713f9#egg=server
+-e git+ssh://git@github.com/Licensaurios/backend-openhands.git@6d83390b12dd3612612938dca00d340951d8ed32#egg=server
 six==1.17.0
 SQLAlchemy==2.0.46
 typing_extensions==4.15.0

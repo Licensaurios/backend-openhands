@@ -1,14 +1,13 @@
 
+from flask_security import auth_required
+
 from flask import (
     Blueprint, jsonify, request
 )
 
 
-from server.controllers.authentication import authorize_user, register_user, login_user
+from server.controllers.authentication import authorize_user, register_user, login_user, process_logout,renew_session
 auth_router = Blueprint('auth', __name__, url_prefix='/auth')
-
-
-
 @auth_router.route("/login/google")
 def google_login():
     #"""
@@ -85,11 +84,28 @@ def register():
     result = register_user(data)
     return jsonify(result)
 
-@auth_router.route("/login", methods=["POST"]) # <--- Cambiado a POST
+@auth_router.route("/login", methods=["POST"]) 
 def login():
     data = request.get_json()
     if not data:
         return jsonify({"error": "No se enviaron datos"}), 400
         
     result, status_code = login_user(data)
+    return jsonify(result), status_code
+
+
+@auth_router.route("/logout", methods=["POST"])
+@auth_required()
+def logout():
+    result, status_code = process_logout()
+    return jsonify(result), status_code
+
+
+@auth_router.route("/renew", methods=["POST"])
+def renew():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Cuerpo de petición vacío"}), 400
+        
+    result, status_code = renew_session(data)
     return jsonify(result), status_code

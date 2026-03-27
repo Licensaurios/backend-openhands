@@ -2,11 +2,10 @@ import re
 import uuid
 import secrets
 import logging
-import sqlalchemy
-from flask_security import current_user
-from flask_security.utils import verify_password
+import time
+from flask_security import logout_user, current_user, login_user as security_login_user
 from werkzeug.security import generate_password_hash, check_password_hash
-
+from server.db.model import db, User, OAuth2Token
 from server.db.model import OAuth2Token, User, db
 
 # Configuración de Logging
@@ -82,17 +81,42 @@ def login_user(data):
         if not user.active:
             return {"error": "Esta cuenta está desactivada"}, 403
             
-        return {
-            "msg": "Login exitoso",
-            "user": {
-                "nombre": user.nombre,
-                "email": user.email
-            }
-        }, 200
+        security_login_user(user) 
+        
+        # 2. Generar Tokens para OAuth2 / Renew
+        access_t = secrets.token_urlsafe(32)
+        refresh_t = secrets.token_urlsafe(32)
+      
+        nuevo_token = OAuth2Token(
+            user_id=user.id,
+            name="default",              
+            token_type="Bearer",        
+            access_token=access_t,
+            refresh_token=refresh_t,
+            expires_at=int(time.time()) + 3600  # Expira en 1 hora
+        )
+        try:
+            db.session.add(nuevo_token)
+            db.session.commit()
+            
+            # 4. Respuesta completa para ver en Bruno
+            return {
+                "msg": "Login exitoso",
+                "user": {
+                    "nombre": user.nombre,
+                    "email": user.email
+                },
+                "tokens": {
+                    "access_token": access_t,
+                    "refresh_token": refresh_t,
+                    "expires_in": 3600
+                }
+            }, 200
+        except Exception as e:
+            db.session.rollback()
+            return {"error": f"Error al generar sesión: {str(e)}"}, 500
     
     return {"error": "Credenciales inválidas"}, 401
-
-# --- CONSTRUCTOS DE AUTHLIB (OAUTH2) ---
 
 def authlib_token_update(
     name: str,
@@ -137,3 +161,57 @@ def authlib_fetch_token(name: str) -> dict | None:
 
     log.warning("Failed to fetch token for [%s].", name)
     return None
+
+def process_logout():
+    try:
+        if current_user.is_authenticated:
+            # 1. Defensa en profundidad: Borramos los tokens activos del usuario en la BD.
+            # Si alguien robó el token, ya no le servirá de nada.
+            OAuth2Token.query.filter_by(user_id=current_user.id).delete()
+            db.session.commit()
+            
+            # 2. Destruimos la sesión actual y limpiamos las cookies
+            logout_user()
+            
+            return {"msg": "Sesión cerrada y tokens invalidados con éxito"}, 200
+        else:
+            return {"error": "No hay ninguna sesión activa para cerrar"}, 400
+            
+    except Exception as e:
+        db.session.rollback()
+        return {"error": f"Error crítico al cerrar sesión: {str(e)}"}, 500    
+
+
+def renew_session(data):
+    old_refresh_token = data.get("refresh_token")
+    
+    if not old_refresh_token:
+        return {"error": "Se requiere el refresh_token para renovar"}, 400
+    token_entry = OAuth2Token.query.filter_by(refresh_token=old_refresh_token).first()
+
+    if not token_entry:
+        return {"error": "Token no encontrado o ya fue invalidado"}, 401
+
+    # 2. Lógica de "Rotación de Tokens" (Seguridad avanzada)
+    # Generamos nuevos nombres/valores para los tokens
+    new_access_token = secrets.token_urlsafe(32)
+    new_refresh_token = secrets.token_urlsafe(32)
+    
+    token_entry.access_token = new_access_token
+    token_entry.refresh_token = new_refresh_token
+    token_entry.expires_at = int(time.time()) + 3600  # Expira en 1 hora
+    
+    try:
+        db.session.commit()
+        return {
+            "status": "success",
+            "tokens": {
+                "access_token": new_access_token,
+                "refresh_token": new_refresh_token,
+                "token_type": "Bearer",
+                "expires_in": 3600
+            }
+        }, 200
+    except Exception as e:
+        db.session.rollback()
+        return {"error": f"Error al actualizar tokens: {str(e)}"}, 500
