@@ -31,13 +31,13 @@ uv sync
 * Activar entorno virtual powershell
 
 ```bash
-./venv/Scripts/Activate.ps1
+./.venv/Scripts/Activate.ps1
 ```
 
 * Activar entorno virtual bash
 
 ```bash
-source ./venv/Scripts/activate
+source ./.venv/Scripts/activate
 ```
 
 * Ejecutar servidor
