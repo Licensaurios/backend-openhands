@@ -3,10 +3,9 @@ import uuid
 import secrets
 import logging
 import time
-
 from flask_mail import Message
 from server.extensiones import mail
-from flask import make_response, jsonify
+from flask import make_response, jsonify, render_template
 from flask_security import logout_user, current_user, login_user as security_login_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from server.db.model import db, User, OAuth2Token
@@ -234,18 +233,18 @@ def renew_session(data):
         db.session.rollback()
         return {"error": f"Error al actualizar tokens: {str(e)}"}, 500
 
+from flask import render_template # Asegúrate de importar esto
+
 def request_password_reset(data):
     email = data.get("email")
     if not email:
         return {"error": "El email es requerido"}, 400
 
     user = User.query.filter_by(email=email).first()
-
     response_msg = {"msg": "Si el correo existe en nuestro sistema, recibirás un enlace de recuperación."}
 
     if user:
         token = secrets.token_urlsafe(32)
-        
         user.reset_token = token
         user.reset_token_expires_at = int(time.time()) + 900
         
@@ -257,14 +256,13 @@ def request_password_reset(data):
                 recipients=[user.email]
             )
             
-            msg.body = f"""Hola {user.nombre},
-
-Has solicitado restablecer tu contraseña. Copia y pega el siguiente token en la aplicación:
-
-TOKEN: {token}
-
-Este código expirará en 15 minutos. Si no solicitaste este cambio, ignora este correo o contacta a soporte.
-"""
+         
+            msg.html = render_template(
+                'auth/reset_email.html', 
+                nombre=user.nombre,
+                token=token
+            )
+            
             mail.send(msg)
 
         except Exception as e:
@@ -320,3 +318,20 @@ Si NO realizaste este cambio, por favor contacta a nuestro equipo de seguridad d
         db.session.rollback()
         print(f"Error en el proceso final de reset: {e}")
         return {"error": "Error al actualizar la contraseña"}, 500
+
+def send_reset_email(user, token):
+    link = f"http://localhost:5173/reset-password?token={token}"
+    
+    msg = Message(
+        subject="Recuperación de Contraseña - OpenHands",
+        sender="noreply@openhands.com",
+        recipients=[user.email]
+    )
+    
+    msg.html = render_template(
+        'reset_password_email.html',
+        nombre=user.nombre,
+        link_recuperacion=link
+    )
+    
+    
