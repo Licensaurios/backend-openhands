@@ -41,7 +41,7 @@ Crea la cuenta del usuario con validaciones de identidad y seguridad.
 ### Exitoso 200
 [
   {
-    "email": "alexvega.2005xl@gmail.com",
+    "email": "",
     "status": "registrado"
   },
   201
@@ -135,9 +135,9 @@ Propósito: Permite mantener al usuario conectado sin pedir credenciales constan
 Consume el token de seguridad enviado por correo para sobreescribir la credencial del usuario.
 
 {
-  "token": "XeCA-5KVSLTg_P6FeJ9PuAX5ytnfQfq8c8SlE3xZpVg",
-  "new_password": "12345",
-  "password_confirm": "12345"
+  "token": "",
+  "new_password": "",
+  "password_confirm": ""
 }
 
 ### Exitoso 200
@@ -186,16 +186,16 @@ Propósito: Validar que quien solicita el cambio de clave tiene acceso real a la
 Valida la persistencia de la identidad y la integridad de los tokens de sesión activos en el navegador.
 Headers Requeridos:
 Cookie: access_token=<jwt_o_uuid_token>
-Exitoso 200
+### Exitoso 200
 {
   "status": "online",
   "user": {
-    "email": "alexvega.2005xl@gmail.com",
-    "nombre": "Alexander"
+    "email": "",
+    "nombre": ""
   }
 }
 
-Error 401
+### Error 401
 {
 "error": "No hay sesión activa (Falta access_token)" o "Tu sesión ha expirado"
 }
