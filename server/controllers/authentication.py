@@ -3,16 +3,16 @@ import uuid
 import secrets
 import logging
 import time
+
+from flask_mail import Message
+from server.extensiones import mail
+from flask import make_response, jsonify
 from flask_security import logout_user, current_user, login_user as security_login_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from server.db.model import db, User, OAuth2Token
 from server.db.model import OAuth2Token, User, db
-
-# Configuración de Logging
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
-
-# --- FUNCIONES DE APOYO Y VALIDACIÓN ---
 
 def validar_email(email: str) -> bool:
     if not email: return False
@@ -23,8 +23,6 @@ def authorize_user():
     return {
         "authorized": "yes"
     }
-
-# --- LÓGICA DE AUTENTICACIÓN (REGISTRO Y LOGIN) ---
 
 def register_user(data):
     nombre = data.get("nombre")
@@ -67,23 +65,24 @@ def register_user(data):
     except Exception as e:
         db.session.rollback()
         return {"error": f"Error al guardar en base de datos: {str(e)}"}, 500
-
 def login_user(data):
     email = data.get("email")
     password = data.get("password")
 
     if not email or not password:
-        return {"error": "Email y contraseña son requeridos"}, 400
+        return make_response(jsonify({"error": "Email y contraseña son requeridos"}), 400)
 
     user = User.query.filter_by(email=email).first()
 
-    if user and check_password_hash(user.password, password):
-        if not user.active:
-            return {"error": "Esta cuenta está desactivada"}, 403
-            
+    if user and check_password_hash(user.password, password) and user.active:
+        
         security_login_user(user) 
         
-        # 2. Generar Tokens para OAuth2 / Renew
+        # --- SOLUCIÓN AL UNIQUE VIOLATION ---
+        # Borramos cualquier token 'default' previo de este usuario
+        OAuth2Token.query.filter_by(user_id=user.id, name="default").delete()
+        # ------------------------------------
+
         access_t = secrets.token_urlsafe(32)
         refresh_t = secrets.token_urlsafe(32)
       
@@ -93,30 +92,50 @@ def login_user(data):
             token_type="Bearer",        
             access_token=access_t,
             refresh_token=refresh_t,
-            expires_at=int(time.time()) + 3600  # Expira en 1 hora
+            expires_at=int(time.time()) + 3600 
         )
+
         try:
             db.session.add(nuevo_token)
             db.session.commit()
             
-            # 4. Respuesta completa para ver en Bruno
-            return {
+            response_data = {
                 "msg": "Login exitoso",
                 "user": {
                     "nombre": user.nombre,
                     "email": user.email
-                },
-                "tokens": {
-                    "access_token": access_t,
-                    "refresh_token": refresh_t,
-                    "expires_in": 3600
                 }
-            }, 200
+            }
+            
+            # --- SOLUCIÓN AL TYPEERROR ---
+            # Siempre devolvemos el objeto response directamente
+            response = make_response(jsonify(response_data), 200)
+
+            response.set_cookie(
+                'access_token', 
+                access_t, 
+                httponly=True, 
+                secure=True, 
+                samesite='Lax',
+                max_age=3600
+            )
+            
+            response.set_cookie(
+                'refresh_token', 
+                refresh_t, 
+                httponly=True, 
+                secure=True, 
+                samesite='Lax',
+                max_age=86400 * 7
+            )
+
+            return response
+
         except Exception as e:
             db.session.rollback()
-            return {"error": f"Error al generar sesión: {str(e)}"}, 500
+            return make_response(jsonify({"error": f"Error al generar sesión: {str(e)}"}), 500)
     
-    return {"error": "Credenciales inválidas"}, 401
+    return make_response(jsonify({"error": "Credenciales inválidas"}), 401)
 
 def authlib_token_update(
     name: str,
@@ -170,7 +189,6 @@ def process_logout():
             OAuth2Token.query.filter_by(user_id=current_user.id).delete()
             db.session.commit()
             
-            # 2. Destruimos la sesión actual y limpiamos las cookies
             logout_user()
             
             return {"msg": "Sesión cerrada y tokens invalidados con éxito"}, 200
@@ -215,3 +233,90 @@ def renew_session(data):
     except Exception as e:
         db.session.rollback()
         return {"error": f"Error al actualizar tokens: {str(e)}"}, 500
+
+def request_password_reset(data):
+    email = data.get("email")
+    if not email:
+        return {"error": "El email es requerido"}, 400
+
+    user = User.query.filter_by(email=email).first()
+
+    response_msg = {"msg": "Si el correo existe en nuestro sistema, recibirás un enlace de recuperación."}
+
+    if user:
+        token = secrets.token_urlsafe(32)
+        
+        user.reset_token = token
+        user.reset_token_expires_at = int(time.time()) + 900
+        
+        try:
+            db.session.commit()
+
+            msg = Message(
+                subject="Recuperación de Contraseña - OpenHands Community",
+                recipients=[user.email]
+            )
+            
+            msg.body = f"""Hola {user.nombre},
+
+Has solicitado restablecer tu contraseña. Copia y pega el siguiente token en la aplicación:
+
+TOKEN: {token}
+
+Este código expirará en 15 minutos. Si no solicitaste este cambio, ignora este correo o contacta a soporte.
+"""
+            mail.send(msg)
+
+        except Exception as e:
+            db.session.rollback()
+            print(f"DEBUG: Error enviando mail: {e}")
+            return {"error": "Error interno al procesar la solicitud"}, 500
+
+    return response_msg, 200
+
+def execute_password_reset(data):
+    token = data.get("token")
+    new_password = data.get("new_password")
+    confirm_password = data.get("password_confirm")
+
+    if not all([token, new_password, confirm_password]):
+        return {"error": "Faltan datos requeridos"}, 400
+
+    if new_password != confirm_password:
+        return {"error": "Las contraseñas no coinciden"}, 400
+
+    user = User.query.filter_by(reset_token=token).first()
+
+    if not user:
+        return {"error": "Token inválido o expirado"}, 400
+
+    tiempo_actual = int(time.time())
+    if tiempo_actual > user.reset_token_expires_at:
+        return {"error": "El token ha expirado. Solicita uno nuevo."}, 400
+
+    user.password = generate_password_hash(new_password, method='pbkdf2:sha256')
+    
+    user.reset_token = None
+    user.reset_token_expires_at = None
+
+    try:
+        db.session.commit()
+
+        msg = Message(
+            subject="Seguridad: Tu contraseña ha sido actualizada",
+            recipients=[user.email]
+        )
+        msg.body = f"""Hola {user.nombre},
+
+Te informamos que la contraseña de tu cuenta en OpenHands ha sido cambiada exitosamente hoy {time.strftime('%d/%m/%Y %H:%M')}.
+
+Si tú realizaste este cambio, puedes ignorar este correo.
+
+Si NO realizaste este cambio, por favor contacta a nuestro equipo de seguridad de inmediato, ya que tu cuenta podría estar en riesgo.
+"""
+        mail.send(msg)
+        return {"msg": "Contraseña actualizada correctamente"}, 200
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error en el proceso final de reset: {e}")
+        return {"error": "Error al actualizar la contraseña"}, 500

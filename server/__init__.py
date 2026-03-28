@@ -5,7 +5,7 @@ from configobj import ConfigObj
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_security import Security, SQLAlchemyUserDatastore
-
+from server.extensiones import mail
 from server.db.model import Role, User, db
 from server.routes.auth import auth_router
 from server.routes.health import health_router
@@ -32,26 +32,32 @@ def init_webapp(config_path: str, test: bool = False) -> Flask:
     else:
         database_uri = "sqlite://"
 
-    # Configuración de la App
     app.config.update(
         SQLALCHEMY_DATABASE_URI=database_uri,
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        
         SECRET_KEY=os.environ.get("SECRET_KEY", "abc1234_dev_key"),
         SECURITY_PASSWORD_HASH="pbkdf2_sha256",
         SECURITY_PASSWORD_SALT="salt_dev",
-        WTF_CSRF_ENABLED=False
+        WTF_CSRF_ENABLED=False,
+
+        MAIL_SERVER='smtp.gmail.com',
+        MAIL_PORT=587,
+        MAIL_USE_TLS=True,
+        MAIL_USERNAME='openhands.path@gmail.com',
+        MAIL_PASSWORD='bcosnfdfgdmkqbcq',  
+        MAIL_DEFAULT_SENDER='Soporte OpenHands <openhands.path@gmail.com>'
     )
 
-    # Inicialización de Extensiones
     db.init_app(app)
+    mail.init_app(app)
+    
     app.register_blueprint(auth_router)
     app.register_blueprint(health_router)
 
-    # Flask-Security Setup
     user_datastore = SQLAlchemyUserDatastore(db, User, Role)
     Security(app, user_datastore)
 
-    # Sincronización de Base de Datos
     with app.app_context():
         if "postgresql" in app.config["SQLALCHEMY_DATABASE_URI"]:
             log.info("Sincronizando modelos con Supabase...")

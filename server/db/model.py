@@ -5,17 +5,16 @@ from sqlalchemy.dialects.postgresql import UUID
 
 db = SQLAlchemy()
 
-roles_users = db.Table(
-    "roles_users",
-    db.Column("user_id", UUID(as_uuid=True), db.ForeignKey("public.user.ID_Usr")),
-    db.Column("role_id", db.Integer(), db.ForeignKey("public.role.id")),
-    schema="public"
+roles_users = db.Table('roles_users',
+    db.Column('ID_Usr', UUID(as_uuid=True), db.ForeignKey('public.user.ID_Usr'), primary_key=True),
+    db.Column('id_rol', db.Integer(), db.ForeignKey('public.role.id_rol'), primary_key=True),
+    schema='public'
 )
 
 class Role(db.Model, RoleMixin):
     __tablename__ = "role"
     __table_args__ = {"schema": "public"}
-    id = db.Column(db.Integer(), primary_key=True)
+    id = db.Column('id_rol', db.Integer(), primary_key=True)
     name = db.Column(db.String(80), unique=True)
     description = db.Column(db.String(255))
 
@@ -31,7 +30,8 @@ class User(db.Model, UserMixin):
     password = db.Column("Psswrd", db.Text, nullable=False)
     fs_uniquifier = db.Column(db.String(255), unique=True, nullable=False, default=lambda: uuid.uuid4().hex)
     active = db.Column(db.Boolean(), default=True)
-
+    reset_token = db.Column(db.String(255), unique=True, nullable=True)
+    reset_token_expires_at = db.Column(db.Integer, nullable=True)
     roles = db.relationship("Role", secondary=roles_users, backref=db.backref("users", lazy="dynamic"))
     tokens = db.relationship("OAuth2Token", back_populates="user", cascade="all, delete-orphan")
 
@@ -39,7 +39,8 @@ class OAuth2Token(db.Model):
     __tablename__ = "oauth2token"
     __table_args__ = {"schema": "public"}
 
-    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey("public.user.ID_Usr"), primary_key=True)
+    user_id = db.Column("ID_Usr", UUID(as_uuid=True), db.ForeignKey("public.user.ID_Usr"), primary_key=True)
+    
     name = db.Column(db.String(40), primary_key=True)
     token_type = db.Column(db.String(40))
     access_token = db.Column(db.Text, nullable=False)
