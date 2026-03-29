@@ -19,11 +19,35 @@ def recurso_to_dict(recurso: Recurso) -> dict:
     }
 
 def get_all_recursos(db: Session) -> list[dict]:
-    recursos = db.query(Recurso).all()
-    return [recurso_to_dict(r) for r in recursos]
+   recursos = db.query(Recurso).all()
+   return [recurso_to_dict(r) for r in recursos]
 
 @resource_router.route("/")
 def get_resources():
+    """
+    Obtener lista de recursos
+    ---
+    tags:
+      - Recursos
+    responses:
+      200:
+        description: Lista de recursos
+        schema:
+          type: object
+          properties:
+            resources:
+              type: array
+              items:
+                properties:
+                  id:
+                    type: string
+                  link:
+                    type: string
+                  descripcion:
+                    type: string
+            count:
+              type: integer
+    """
     db = next(get_db())
     recursos = get_all_recursos(db)
     db.close()

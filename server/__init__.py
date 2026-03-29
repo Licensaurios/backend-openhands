@@ -5,6 +5,8 @@ from configobj import ConfigObj
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_security import Security, SQLAlchemyUserDatastore
+from flasgger import Swagger
+
 from server.extensiones import mail
 from server.db.model import Role, User, db
 from server.routes.auth import auth_router
@@ -14,11 +16,38 @@ from server.routes.resource import resource_router
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
+swagger_config = {
+    "headers": [],
+    "specs": [
+        {
+            "endpoint": "apispec",
+            "route": "/apispec.json",
+            "rule_filter": lambda rule: True,  # incluir todos los endpoints
+            "model_filter": lambda tag: True,
+        }
+    ],
+    "static_url_path": "/flasgger_static",
+    "swagger_ui": True,
+    "specs_route": "/docs/"
+}
+
+swagger_template = {
+    "info": {
+        "title": "OpenHands API",
+        "version": "1.0.0",
+        "description": "Documentación de la API de la plataforma OpenHands"
+    },
+    "host": "localhost:5000",
+    "basePath": "/",
+    "schemes": ["http", "https"],
+}
+
 def init_webapp(config_path: str, test: bool = False) -> Flask:
     app = Flask(__name__)
     
     abs_config_path = os.path.abspath(config_path)
-    
+
+    Swagger(app, config=swagger_config, template=swagger_template)
     if not test:
         if not os.path.exists(abs_config_path):
             log.error(f"Archivo de configuración no encontrado en: {abs_config_path}")
@@ -66,5 +95,6 @@ def init_webapp(config_path: str, test: bool = False) -> Flask:
             db.create_all()
         else:
             log.warning("No se detectó Postgres, omitiendo create_all()")
+
 
     return app
