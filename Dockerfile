@@ -18,7 +18,7 @@ WORKDIR /build/server
 COPY uv.lock /build/server
 COPY pyproject.toml README.md /build/server/
 COPY debian /build/server/debian
-COPY serverlearnify /build/server/serverlearnify
+COPY server /build/server/server
 COPY config /build/server/config
 RUN dpkg-buildpackage -us -uc -b
 
