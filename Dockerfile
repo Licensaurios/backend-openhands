@@ -12,13 +12,13 @@ RUN pip install uv
 # ── App directory ───────────────────────────────────────────────────────────
 WORKDIR /app
 
-# ── Dependencias (cacheadas si no cambia pyproject.toml) ────────────────────
-COPY pyproject.toml uv.lock* ./
-
-RUN uv sync --group dev
-
-# ── Código fuente ───────────────────────────────────────────────────────────
+# ── Copiar todo el proyecto ──────────────────────────────────────────────────
+# Se copia todo junto porque setuptools necesita server/ y README.md
+# para poder instalar el paquete como editable durante uv sync
 COPY . .
+
+# ── Instalar dependencias ────────────────────────────────────────────────────
+RUN uv sync --group dev
 
 # ── Puerto ──────────────────────────────────────────────────────────────────
 ENV PORT=5000
