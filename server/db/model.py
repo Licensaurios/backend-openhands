@@ -1,9 +1,46 @@
 import uuid
+import os
+import logging
+import sys
 from flask_sqlalchemy import SQLAlchemy
+from configobj import ConfigObj
 from flask_security import RoleMixin, UserMixin
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 db = SQLAlchemy()
+
+logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger(__name__)
+
+def get_uri():
+
+    config_path = 'config/dev.config'
+    abs_config_path = os.path.abspath(config_path)
+    
+    if not os.path.exists(abs_config_path):
+        log.error(f"Archivo de configuración no encontrado en: {abs_config_path}")
+        sys.exit(1)
+        
+    try:
+        config = ConfigObj(abs_config_path, encoding='utf8')
+        database_uri = config["webapp"]["database_uri"]
+    except Exception as e:
+        log.error(f"Error al procesar config: {e}")
+        sys.exit(1)
+
+    return database_uri
+
+engine = create_engine(get_uri())
+SessionLocal = sessionmaker(bind=engine)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 roles_users = db.Table('roles_users',
     db.Column('ID_Usr', UUID(as_uuid=True), db.ForeignKey('public.user.ID_Usr'), primary_key=True),
