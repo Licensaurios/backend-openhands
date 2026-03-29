@@ -29,6 +29,7 @@ dependencies = [
     "gunicorn",
     "requests",
     "gevent>=25.9.1",
+    "psycopg2>=2.9.11",
 ]
 
 [project.scripts]

@@ -1,14 +1,15 @@
 
+from flask_security import auth_required
+
+from server.utils.auth_decorators import token_required 
 from flask import (
-    Blueprint, jsonify
+    Blueprint, jsonify, request
 )
+from server.controllers.authentication import(
+    authorize_user, register_user, login_user, process_logout, renew_session, request_password_reset, execute_password_reset
 
-
-from server.controllers.authentication import authorize_user
-
+)
 auth_router = Blueprint('auth', __name__, url_prefix='/auth')
-
-
 @auth_router.route("/login/google")
 def google_login():
     #"""
@@ -79,4 +80,61 @@ def auth():
     #return redirect(url_for("index"))
 
 
+@auth_router.route("/register", methods=["POST"])
+def register():
+    data = request.get_json()
+    result = register_user(data)
+    return jsonify(result)
 
+@auth_router.route("/login", methods=["POST"]) 
+def login():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No se enviaron datos"}), 400
+        
+    response = login_user(data)
+    return response
+    return jsonify(result), status_code
+
+
+@auth_router.route("/logout", methods=["POST"])
+@auth_required()
+def logout():
+    result, status_code = process_logout()
+    return jsonify(result), status_code
+
+
+@auth_router.route("/renew", methods=["POST"])
+def renew():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Cuerpo de petición vacío"}), 400
+        
+    result, status_code = renew_session(data)
+    return jsonify(result), status_code
+
+
+
+@auth_router.route("/pswdrecover", methods=["POST"])
+def recover_password():
+    data = request.get_json()
+    result, status_code = request_password_reset(data)
+    return jsonify(result), status_code
+
+@auth_router.route("/pswdreset", methods=["POST"])
+def reset_password():
+    data = request.get_json()
+    result, status_code = execute_password_reset(data)
+    return jsonify(result), status_code
+
+@auth_router.route('/check-session', methods=['GET'])
+@token_required
+def check_session(current_user):
+   
+    return jsonify({
+        "status": "online",
+        "user": {
+            "nombre": current_user.nombre,
+            "email": current_user.email
+        }
+    }), 200    

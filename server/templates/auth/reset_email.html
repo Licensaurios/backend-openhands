@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+       
+        .body-bg { background-color: #f6f9fc; padding: 40px 0; font-family: 'Segoe UI', Arial, sans-serif; }
+        .card { max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #e1e8ed; }
+        .header { background-color: #2c3e50; padding: 30px; text-align: center; }
+        .content { padding: 40px; color: #444; line-height: 1.6; }
+        .token-box { background-color: #f8f9fa; border: 2px dashed #3498db; padding: 15px; text-align: center; font-family: 'Courier New', monospace; font-size: 1.3em; color: #2980b9; margin: 20px 0; border-radius: 6px; letter-spacing: 2px; }
+        .footer { padding: 20px; text-align: center; font-size: 12px; color: #95a5a6; }
+    </style>
+</head>
+<body>
+    <div class="body-bg">
+        <div class="card">
+            <div class="header">
+                <img src="https://rflnfdxdoehgxvzffsow.supabase.co/storage/v1/object/public/Images/OpenHandsLogoWhite.png" 
+                     alt="OpenHands Logo" 
+                     style="width: 80px; height: auto; margin-bottom: 10px;">
+                <h2 style="margin: 0; color: #ffffff; font-size: 18px; text-transform: uppercase; letter-spacing: 2px;">
+                    OpenHands Community
+                </h2>
+            </div>
+
+            <div class="content">
+                <p>Hola <strong>{{ nombre }}</strong>,</p>
+                <p>Has solicitado restablecer tu contraseña. Utiliza el siguiente código de seguridad para continuar:</p>
+                
+                <div class="token-box">
+                    {{ token }}
+                </div>
+                
+                <p style="font-size: 0.85em; color: #7f8c8d;">
+                    * Este código expirará en <strong>15 minutos</strong>. Si no solicitaste este cambio, por favor ignora este correo.
+                </p>
+            </div>
+
+            <div class="footer">
+                &copy; 2026 OpenHands Project <br>
+                Sinaloa, México
+            </div>
+        </div>
+    </div>
+</body>
+</html>
