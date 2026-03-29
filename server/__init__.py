@@ -9,6 +9,7 @@ from server.extensiones import mail
 from server.db.model import Role, User, db
 from server.routes.auth import auth_router
 from server.routes.health import health_router
+from server.routes.resource import resource_router
 
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
@@ -54,6 +55,7 @@ def init_webapp(config_path: str, test: bool = False) -> Flask:
     
     app.register_blueprint(auth_router)
     app.register_blueprint(health_router)
+    app.register_blueprint(resource_router)
 
     user_datastore = SQLAlchemyUserDatastore(db, User, Role)
     Security(app, user_datastore)
