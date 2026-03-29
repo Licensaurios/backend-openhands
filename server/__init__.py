@@ -7,7 +7,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_security import Security, SQLAlchemyUserDatastore
 from flasgger import Swagger
 
-from server.extensiones import mail
+from server.extensiones impopython3 -m venv .venvrt mail
 from server.db.model import Role, User, db
 from server.routes.auth import auth_router
 from server.routes.health import health_router
@@ -16,6 +16,9 @@ from server.routes.resource import resource_router
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
+from dotenv import load_dotenv  # Asegúrate de instalarlo: pip install python-dotenv
+
+load_dotenv()
 swagger_config = {
     "headers": [],
     "specs": [
@@ -45,38 +48,35 @@ swagger_template = {
 def init_webapp(config_path: str, test: bool = False) -> Flask:
     app = Flask(__name__)
     
-    abs_config_path = os.path.abspath(config_path)
-
-    Swagger(app, config=swagger_config, template=swagger_template)
-    if not test:
-        if not os.path.exists(abs_config_path):
-            log.error(f"Archivo de configuración no encontrado en: {abs_config_path}")
-            sys.exit(1)
-            
-        try:
+    database_uri = os.environ.get("DATABASE_URL")
+    
+    if not test and not database_uri:
+        abs_config_path = os.path.abspath(config_path)
+        if os.path.exists(abs_config_path):
             config = ConfigObj(abs_config_path, encoding='utf8')
             database_uri = config["webapp"]["database_uri"]
-        except Exception as e:
-            log.error(f"Error al procesar config: {e}")
+        else:
+            log.error("No se encontró DATABASE_URL en .env ni dev.config")
             sys.exit(1)
-    else:
+    elif test:
         database_uri = "sqlite://"
 
     app.config.update(
         SQLALCHEMY_DATABASE_URI=database_uri,
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         
-        SECRET_KEY=os.environ.get("SECRET_KEY", "abc1234_dev_key"),
+        SECRET_KEY=os.environ.get("SECRET_KEY", "dev_key_fallback"),
+        SECURITY_PASSWORD_SALT=os.environ.get("SECURITY_PASSWORD_SALT", "salt_fallback"),
+        
         SECURITY_PASSWORD_HASH="pbkdf2_sha256",
-        SECURITY_PASSWORD_SALT="salt_dev",
         WTF_CSRF_ENABLED=False,
 
         MAIL_SERVER='smtp.gmail.com',
         MAIL_PORT=587,
         MAIL_USE_TLS=True,
-        MAIL_USERNAME='openhands.path@gmail.com',
-        MAIL_PASSWORD='bcosnfdfgdmkqbcq',  
-        MAIL_DEFAULT_SENDER='Soporte OpenHands <openhands.path@gmail.com>'
+        MAIL_USERNAME=os.environ.get("MAIL_USERNAME"),
+        MAIL_PASSWORD=os.environ.get("MAIL_PASSWORD"),
+        MAIL_DEFAULT_SENDER=os.environ.get("MAIL_DEFAULT_SENDER")
     )
 
     db.init_app(app)
