@@ -30,6 +30,7 @@ dependencies = [
     "requests",
     "gevent>=25.9.1",
     "psycopg2>=2.9.11",
+    "flask-mail>=0.10.0",
 ]
 
 [project.scripts]
