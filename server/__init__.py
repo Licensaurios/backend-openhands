@@ -6,43 +6,36 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_security import Security, SQLAlchemyUserDatastore
 from flasgger import Swagger
+from dotenv import load_dotenv
 
-from server.extensiones impopython3 -m venv .venvrt mail
+# 1. IMPORTACIONES DE TU PROYECTO
 from server.db.model import Role, User, db
+from server.extensiones import mail  # <--- ESTA FALTABA
 from server.routes.auth import auth_router
 from server.routes.health import health_router
 from server.routes.resource import resource_router
+from server.routes.community import community_router
 
+# Configuración de Logging
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
-from dotenv import load_dotenv  # Asegúrate de instalarlo: pip install python-dotenv
-
 load_dotenv()
+
+# Configuración de Swagger
 swagger_config = {
     "headers": [],
     "specs": [
         {
             "endpoint": "apispec",
             "route": "/apispec.json",
-            "rule_filter": lambda rule: True,  # incluir todos los endpoints
+            "rule_filter": lambda rule: True,
             "model_filter": lambda tag: True,
         }
     ],
     "static_url_path": "/flasgger_static",
     "swagger_ui": True,
     "specs_route": "/docs/"
-}
-
-swagger_template = {
-    "info": {
-        "title": "OpenHands API",
-        "version": "1.0.0",
-        "description": "Documentación de la API de la plataforma OpenHands"
-    },
-    "host": "localhost:5000",
-    "basePath": "/",
-    "schemes": ["http", "https"],
 }
 
 def init_webapp(config_path: str, test: bool = False) -> Flask:
@@ -59,18 +52,15 @@ def init_webapp(config_path: str, test: bool = False) -> Flask:
             log.error("No se encontró DATABASE_URL en .env ni dev.config")
             sys.exit(1)
     elif test:
-        database_uri = "sqlite://"
+        database_uri = "sqlite:///:memory:"
 
     app.config.update(
         SQLALCHEMY_DATABASE_URI=database_uri,
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
-        
         SECRET_KEY=os.environ.get("SECRET_KEY", "dev_key_fallback"),
         SECURITY_PASSWORD_SALT=os.environ.get("SECURITY_PASSWORD_SALT", "salt_fallback"),
-        
         SECURITY_PASSWORD_HASH="pbkdf2_sha256",
         WTF_CSRF_ENABLED=False,
-
         MAIL_SERVER='smtp.gmail.com',
         MAIL_PORT=587,
         MAIL_USE_TLS=True,
@@ -81,20 +71,21 @@ def init_webapp(config_path: str, test: bool = False) -> Flask:
 
     db.init_app(app)
     mail.init_app(app)
-    
+    Swagger(app, config=swagger_config) 
+
     app.register_blueprint(auth_router)
     app.register_blueprint(health_router)
     app.register_blueprint(resource_router)
+    app.register_blueprint(community_router) 
 
     user_datastore = SQLAlchemyUserDatastore(db, User, Role)
     Security(app, user_datastore)
 
     with app.app_context():
-        if "postgresql" in app.config["SQLALCHEMY_DATABASE_URI"]:
+        uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+        if "postgresql" in uri or "postgres" in uri:
             log.info("Sincronizando modelos con Supabase...")
-            db.create_all()
         else:
             log.warning("No se detectó Postgres, omitiendo create_all()")
-
 
     return app
