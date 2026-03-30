@@ -2,12 +2,17 @@ import uuid
 import os
 import logging
 import sys
+import datetime
 from flask_sqlalchemy import SQLAlchemy
 from configobj import ConfigObj
 from flask_security import RoleMixin, UserMixin
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+# Cambia esto:
+from server.db.community import Publicacion
+# Por esto:
+from server.db.model import Publicacion
 
 db = SQLAlchemy()
 
@@ -85,3 +90,40 @@ class OAuth2Token(db.Model):
     expires_at = db.Column(db.Integer, default=0)
     
     user = db.relationship("User", back_populates="tokens")
+
+# --- MODELO DE LIKES (REACCIÓN RÁPIDA) ---
+class Like_Post(db.Model):
+    __tablename__ = 'Like_pblcn' # Nombre exacto en tu SQL
+    __table_args__ = {"schema": "public"}
+    
+    ID_Usr = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.user.ID_Usr'), primary_key=True)
+    ID_pblcn = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.Publicacion.ID_pblcn'), primary_key=True)
+    Fch_like = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
+
+# --- MODELO DE GUARDADOS (BIBLIOTECA PERSONAL / FAVORITOS) ---
+class Post_Guardado(db.Model):
+    __tablename__ = 'Fvrt_Usr' # Usamos tu tabla existente para guardar
+    __table_args__ = {"schema": "public"}
+    
+    # En tu esquema Fvrt_Usr tiene un ID propio, lo respetamos:
+    ID_fvrt = db.Column(db.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    ID_Usr = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.user.ID_Usr'), nullable=False)
+    ID_pblcn = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.Publicacion.ID_pblcn'), nullable=False)
+
+# --- MODELO DE PUBLICACIÓN ACTUALIZADO ---
+class Publicacion(db.Model):
+    __tablename__ = 'Publicacion'
+    __table_args__ = {"schema": "public"}
+    
+    ID_pblcn = db.Column(db.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    ID_Usr = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.user.ID_Usr'), nullable=False)
+    ID_cmnd = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.Comunidad.iD_cmnd'), nullable=False)
+    
+    Titulo = db.Column(db.Text, nullable=False, default='Publicación sin título')
+    Dscrpcn = db.Column(db.Text) # Cambié Contenido por Dscrpcn para que coincida con tu SQL
+    Fch_pblcn = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
+    Votos_Karma = db.Column(db.Integer, default=0)
+
+    # Relaciones actualizadas
+    likes = db.relationship('Like_Post', backref='publicacion', lazy='dynamic', cascade="all, delete-orphan")
+    favoritos = db.relationship('Post_Guardado', backref='publicacion', lazy='dynamic', cascade="all, delete-orphan")
