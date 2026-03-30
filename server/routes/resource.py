@@ -1,7 +1,6 @@
 from flask import Blueprint
-from flask_security import auth_required  # <-- IMPORTAMOS EL CANDADO AQUÍ
+from flask_security import auth_required
 
-# Importamos las funciones desde el controlador que creamos
 from server.controllers.resource import create_resource, get_paginated_resources
 
 resource_router = Blueprint('resources', __name__, url_prefix='/resources')
@@ -24,37 +23,12 @@ def get_resources():
         description: Etiquetas separadas por coma (ej. python,backend)
     responses:
       200:
-        description: Lista paginada de recursos
-        schema:
-          type: object
-          properties:
-            items:
-              type: array
-              items:
-                properties:
-                  id:
-                    type: string
-                  link:
-                    type: string
-                  descripcion:
-                    type: string
-                  tags:
-                    type: array
-                    items:
-                      type: string
-            total:
-              type: integer
-            page:
-              type: integer
-            has_more:
-              type: boolean
+        description: Lista paginada de recursos formateada para el Frontend
     """
-    # Llamamos a la función del controlador que maneja la paginación y filtros
     return get_paginated_resources()
 
-
 @resource_router.route("/", methods=["POST"])
-@auth_required()  # <-- PONEMOS EL CANDADO SOLO EN EL POST (DEBE IR DEBAJO DE @route)
+@auth_required()
 def post_resource():
     """
     Crear un nuevo recurso
@@ -80,13 +54,17 @@ def post_resource():
               items:
                 type: string
               description: Lista de etiquetas
+            images:
+              type: array
+              items:
+                type: string
+              description: Arreglo de URLs de imágenes alojadas (ej. Cloudinary)
     responses:
       201:
-        description: Recurso creado exitosamente
+        description: Recurso e imágenes creados exitosamente
       400:
         description: Error de validación
       401:
         description: No autorizado (Falta iniciar sesión)
     """
-    # Llamamos a la función del controlador que maneja la creación y guardado de tags
     return create_resource()
