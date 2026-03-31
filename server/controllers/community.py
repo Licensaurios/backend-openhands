@@ -6,6 +6,7 @@ from flask import request, jsonify
 from flask_security import current_user, auth_required
 from sqlalchemy import or_, func
 from server.db.model import db 
+from sqlalchemy.orm import joinedload
 from server.db.community import Comunidad, Chat, Usuario_Comunidad, Tag, Comunidad_Tag
 
 log = logging.getLogger(__name__)
@@ -295,7 +296,6 @@ def leave_community(comm_id):
         return jsonify({"error": "Error al procesar salida"}), 500
 
 # --- BUSCADOR ---
-@auth_required()
 def search_communities():
     search_query = request.args.get('q', '')
     page = int(request.args.get('page', 1))
@@ -677,8 +677,8 @@ def get_community_post_count(comm_id):
 def get_community_feed(comm_id):
     try:
         publicaciones = Publicacion.query.filter_by(
-            ID_cmnd=comm_idm
-            active=true
+            ID_cmnd=comm_id,
+            active=True
         ).order_by(Publicacion.Fch_pblcn.desc()).all()
 
         feed = []

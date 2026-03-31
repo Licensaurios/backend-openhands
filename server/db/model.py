@@ -9,10 +9,8 @@ from flask_security import RoleMixin, UserMixin
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-# Cambia esto:
-from server.db.community import Publicacion
 # Por esto:
-from server.db.model import Publicacion
+#from .model import Publicacion
 
 db = SQLAlchemy()
 
