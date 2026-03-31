@@ -6,11 +6,9 @@ import datetime
 from flask_sqlalchemy import SQLAlchemy
 from configobj import ConfigObj
 from flask_security import RoleMixin, UserMixin
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-# Por esto:
-#from .model import Publicacion
 
 db = SQLAlchemy()
 
@@ -18,7 +16,6 @@ logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
 def get_uri():
-
     config_path = 'config/dev.config'
     abs_config_path = os.path.abspath(config_path)
     
@@ -39,17 +36,20 @@ engine = create_engine(get_uri())
 SessionLocal = sessionmaker(bind=engine)
 
 def get_db():
-    db = SessionLocal()
+    db_session = SessionLocal()
     try:
-        yield db
+        yield db_session
     finally:
-        db.close()
+        db_session.close()
+
+# --- TABLAS DE RELACIÓN ---
 
 roles_users = db.Table('roles_users',
     db.Column('ID_Usr', UUID(as_uuid=True), db.ForeignKey('public.user.ID_Usr'), primary_key=True),
     db.Column('id_rol', db.Integer(), db.ForeignKey('public.role.id_rol'), primary_key=True),
     schema='public'
-)
+)   
+# --- MODELOS DE SEGURIDAD ---
 
 class Role(db.Model, RoleMixin):
     __tablename__ = "role"
@@ -72,6 +72,7 @@ class User(db.Model, UserMixin):
     active = db.Column(db.Boolean(), default=True)
     reset_token = db.Column(db.String(255), unique=True, nullable=True)
     reset_token_expires_at = db.Column(db.Integer, nullable=True)
+    
     roles = db.relationship("Role", secondary=roles_users, backref=db.backref("users", lazy="dynamic"))
     tokens = db.relationship("OAuth2Token", back_populates="user", cascade="all, delete-orphan")
 
@@ -80,7 +81,6 @@ class OAuth2Token(db.Model):
     __table_args__ = {"schema": "public"}
 
     user_id = db.Column("ID_Usr", UUID(as_uuid=True), db.ForeignKey("public.user.ID_Usr"), primary_key=True)
-    
     name = db.Column(db.String(40), primary_key=True)
     token_type = db.Column(db.String(40))
     access_token = db.Column(db.Text, nullable=False)
@@ -89,39 +89,57 @@ class OAuth2Token(db.Model):
     
     user = db.relationship("User", back_populates="tokens")
 
-# --- MODELO DE LIKES (REACCIÓN RÁPIDA) ---
+# --- MODELOS DE INTERACCIÓN ---
+
 class Like_Post(db.Model):
-    __tablename__ = 'Like_pblcn' # Nombre exacto en tu SQL
+    __tablename__ = 'Like_pblcn' 
     __table_args__ = {"schema": "public"}
     
-    ID_Usr = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.user.ID_Usr'), primary_key=True)
-    ID_pblcn = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.Publicacion.ID_pblcn'), primary_key=True)
+    ID_Usr = db.Column(UUID(as_uuid=True), db.ForeignKey('public.user.ID_Usr'), primary_key=True)
+    ID_pblcn = db.Column(UUID(as_uuid=True), db.ForeignKey('public.Publicacion.ID_pblcn'), primary_key=True)
     Fch_like = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
 
-# --- MODELO DE GUARDADOS (BIBLIOTECA PERSONAL / FAVORITOS) ---
 class Post_Guardado(db.Model):
-    __tablename__ = 'Fvrt_Usr' # Usamos tu tabla existente para guardar
+    __tablename__ = 'Fvrt_Usr' 
     __table_args__ = {"schema": "public"}
     
-    # En tu esquema Fvrt_Usr tiene un ID propio, lo respetamos:
-    ID_fvrt = db.Column(db.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    ID_Usr = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.user.ID_Usr'), nullable=False)
-    ID_pblcn = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.Publicacion.ID_pblcn'), nullable=False)
+    ID_fvrt = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    ID_Usr = db.Column(UUID(as_uuid=True), db.ForeignKey('public.user.ID_Usr'), nullable=False)
+    ID_pblcn = db.Column(UUID(as_uuid=True), db.ForeignKey('public.Publicacion.ID_pblcn'), nullable=False)
 
-# --- MODELO DE PUBLICACIÓN ACTUALIZADO ---
+# --- MODELO DE CONTENIDO ---
+
 class Publicacion(db.Model):
     __tablename__ = 'Publicacion'
     __table_args__ = {"schema": "public"}
     
-    ID_pblcn = db.Column(db.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    ID_Usr = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.user.ID_Usr'), nullable=False)
-    ID_cmnd = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.Comunidad.iD_cmnd'), nullable=False)
-    
+    ID_pblcn = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    ID_Usr = db.Column(UUID(as_uuid=True), db.ForeignKey('public.user.ID_Usr'), nullable=True) 
+    ID_cmnd = db.Column(UUID(as_uuid=True), db.ForeignKey('public.Comunidad.iD_cmnd'), nullable=True)
+    ID_Pryct = db.Column(UUID(as_uuid=True), nullable=True)
     Titulo = db.Column(db.Text, nullable=False, default='Publicación sin título')
-    Dscrpcn = db.Column(db.Text) # Cambié Contenido por Dscrpcn para que coincida con tu SQL
+    Dscrpcn = db.Column(db.Text)
     Fch_pblcn = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
     Votos_Karma = db.Column(db.Integer, default=0)
 
-    # Relaciones actualizadas
-    likes = db.relationship('Like_Post', backref='publicacion', lazy='dynamic', cascade="all, delete-orphan")
-    favoritos = db.relationship('Post_Guardado', backref='publicacion', lazy='dynamic', cascade="all, delete-orphan")
+    Extra_Metadata = db.Column(JSONB, default={
+        "is_anonymous": False,
+        "hasCode": False,
+        "codeLines": [], 
+        "refs": [],      
+        "user_removed": False
+    })
+
+
+class Comentario(db.Model):
+    __tablename__ = 'Comentario'
+    __table_args__ = {"schema": "public"}
+    
+    ID_Cmmnt = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    ID_pblcn = db.Column(UUID(as_uuid=True), db.ForeignKey('public.Publicacion.ID_pblcn'), nullable=True)
+    ID_Usr = db.Column(UUID(as_uuid=True), db.ForeignKey('public.user.ID_Usr'), nullable=True)
+    Contenido = db.Column(db.Text, nullable=False)
+    Votos_Karma = db.Column(db.Integer, default=0)
+    Fch_creacion = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
+    
+    Respuesta_A_ID = db.Column(UUID(as_uuid=True), db.ForeignKey('public.Comentario.ID_Cmmnt'), nullable=True)

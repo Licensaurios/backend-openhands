@@ -2,6 +2,7 @@ import datetime
 import uuid
 import logging
 import re 
+from server.db.model import Publicacion
 from flask import request, jsonify
 from flask_security import current_user, auth_required
 from sqlalchemy import or_, func
@@ -373,7 +374,7 @@ def get_community_members(comm_id):
 
 
 # --- COMUNIDADES TRENDING ---
-@auth_required()
+
 def get_trending_communities():
     try:
         query_popular = (

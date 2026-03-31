@@ -16,6 +16,7 @@ from server.routes.health import health_router
 from server.routes.resource import resource_router
 from server.routes.community import community_router
 from server.sockets.events import register_chat_events 
+from server.routes.post import post_router
 
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
@@ -79,6 +80,7 @@ def init_webapp(config_path: str, test: bool = False) -> Flask:
     app.register_blueprint(health_router)
     app.register_blueprint(resource_router)
     app.register_blueprint(community_router) 
+    app.register_blueprint(post_router)
     user_datastore = SQLAlchemyUserDatastore(db, User, Role)
     Security(app, user_datastore)
 

@@ -33,22 +33,19 @@ class Comunidad(db.Model):
     
     pfp_cmnd = db.Column(db.Text)
     banner_cmnd = db.Column(db.Text)
-    
-    # Relaciones
-    tags = db.relationship('Tag', secondary='public.Comunidad_Tag', backref=db.backref('comunidades', lazy='dynamic'))
+    tags = db.relationship('Tag', secondary='public.Comunidad_Tag', backref=db.backref('comunidades', lazy='dynamic', overlaps="tags"), overlaps="tags")
     reglas = db.relationship('Regla_Comunidad', backref='comunidad', lazy=True, cascade="all, delete-orphan")
     miembros = db.relationship('Usuario_Comunidad', backref='comunidad', lazy=True)
 
 # --- MODELO DE REGLAS ---
 class Regla_Comunidad(db.Model):
-    __tablename__ = 'regla_comunidad' 
-    __table_args__ = {"schema": "public"}
+    __tablename__ = 'regla_comunidad'
     
-    ID_Regla = db.Column(db.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    ID_cmnd = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.Comunidad.iD_cmnd'), nullable=False)
-    Nombre_Regla = db.Column(db.String(100), nullable=False)
-    Dscrpcn = db.Column(db.Text)
-    Orden = db.Column(db.Integer, nullable=False)
+    id_regla = db.Column(db.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id_cmnd = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.Comunidad.iD_cmnd'), nullable=False)
+    nombre_regla = db.Column(db.String, nullable=False) 
+    dscrpcn = db.Column(db.Text)
+    orden = db.Column(db.Integer, nullable=False)
 
 # --- TABLA INTERMEDIA (MIEMBROS CON ROLES Y SOFT DELETE) ---
 class Usuario_Comunidad(db.Model):
@@ -58,10 +55,8 @@ class Usuario_Comunidad(db.Model):
     ID_Usr = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.user.ID_Usr'), primary_key=True)
     ID_cmnd = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.Comunidad.iD_cmnd'), primary_key=True)
     Fch_ingreso = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
-    
-    # NUEVOS CAMPOS PARA ROLES Y CONTROL
     Rol = db.Column(db.String(20), default='miembro', nullable=False) # 'fundador', 'moderador', 'miembro'
-    Is_Active = db.Column(db.Boolean, default=True, nullable=False)   # False = se salió de la comunidad
+    Is_Active = db.Column(db.Boolean, default=True, nullable=False) 
 
 # --- MODELO DE CHAT ---
 class Chat(db.Model):
