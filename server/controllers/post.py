@@ -13,37 +13,50 @@ def get_user_posts(user_id):
     posts = Publicacion.query.filter_by(ID_Usr=user_id).order_by(desc(Publicacion.Fch_pblcn)).all()
     return jsonify([format_post_output(p) for p in posts]), 200
 
-
 @auth_required()
 def create_post():
     data = request.get_json()
+    
     titulo = data.get('title', '').strip()
     if len(titulo) < 5:
         return jsonify({"error": "Título demasiado corto"}), 400
-    id_cmnd = data.get('id_cmnd') 
-
+    id_comunidad = data.get('community_id')
+    
+    if id_comunidad:
+        comunidad = Comunidad.query.get(id_comunidad)
+        if not comunidad:
+            return jsonify({"error": "La comunidad especificada no existe"}), 404
+        
+    
     nuevo_post = Publicacion(
-        ID_Usr=current_user.id,
+        ID_Usr=current_user.id, 
         Titulo=titulo,
         Dscrpcn=data.get('content', ''),
-        ID_cmnd=id_cmnd, 
+        ID_cmnd=id_comunidad,   
         ID_Pryct=data.get('id_pryct'), 
         
         Extra_Metadata={
             "is_anonymous": data.get('is_anonymous', False),
             "hasCode": data.get('hasCode', False),
             "codeLang": data.get('codeLang', 'text'),
-            "codeLines": data.get('codeLines', []), # Arreglo de {text, color}
-            "refs": data.get('refs', []),           # Arreglo de {label, sub}
+            "codeLines": data.get('codeLines', []),
+            "refs": data.get('refs', []),
             "featured": data.get('featured', False)
         },
         Votos_Karma=0,
-        Fch_pblcn=datetime.utcnow()
+        Fch_pblcn=datetime.utcnow() 
     )
     
-    db.session.add(nuevo_post)
-    db.session.commit()
-    return jsonify({"mensaje": "Post publicado", "id": str(nuevo_post.ID_pblcn)}), 201
+    try:
+        db.session.add(nuevo_post)
+        db.session.commit()
+        return jsonify({
+            "mensaje": "Post publicado con éxito", 
+            "id": str(nuevo_post.ID_pblcn)
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Error al guardar en la base de datos"}), 500
 
 def user_feed():
     user_id = current_user.id
