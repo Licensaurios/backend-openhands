@@ -9,6 +9,7 @@ from server.db.community import Tag
 
 log = logging.getLogger(__name__)
 
+
 def _handle_resource_tags(recurso_id, tags_list):
     """Maneja la asignación de tags al recurso (Relación Muchos a Muchos)."""
     if not tags_list:
@@ -26,13 +27,18 @@ def _handle_resource_tags(recurso_id, tags_list):
         relacion = Recurso_Tag(ID_Rcrs=recurso_id, id=tag_obj.id)
         db.session.add(relacion)
 
+
 # --- ENDPOINT: CREAR RECURSO ---
 def create_resource():
     data = request.get_json()
     link = data.get('link')
     descripcion = data.get('descripcion')
     tags_recibidos = data.get('tags', [])
-    imagenes_recibidas = data.get('images', [])  # Extraemos las URLs de imágenes
+    imagenes_recibidas = data.get('images', [])
+
+    # Nuevos campos
+    title = data.get('title')
+    is_markdown = data.get('markdown', False)  # Si no lo mandan, por defecto es False
 
     if not link:
         return jsonify({"error": "El link es obligatorio"}), 400
@@ -44,18 +50,18 @@ def create_resource():
         ID_Rcrs=recurso_id,
         Link=link,
         Dscrpcn=descripcion,
+        title=title,  # Guardamos el título
+        markdown=is_markdown,  # Guardamos si es markdown
         ID_Usr=usuario_id_real,
         Fch_plcn=datetime.datetime.now(datetime.timezone.utc)
     )
 
     try:
         db.session.add(nuevo_recurso)
-        db.session.flush() # Sincroniza para usar el recurso_id en las imágenes
+        db.session.flush()
 
-        # Procesamos etiquetas
         _handle_resource_tags(recurso_id, tags_recibidos)
 
-        # Procesamos y guardamos las imágenes
         for img_url in imagenes_recibidas:
             nueva_imagen = RecursoImg(url=img_url, ID_Rcrs=recurso_id)
             db.session.add(nueva_imagen)
@@ -96,25 +102,22 @@ def get_paginated_resources():
 
     resultado = []
     for r in recursos:
-        # 1. Buscamos al usuario usando el ID (mapeado como 'id' en tu clase)
         usuario = User.query.get(r.ID_Usr)
-
-        # 2. Usamos el atributo 'nombre' que es el que tienes definido en el código
         nombre_autor = usuario.nombre if (usuario and usuario.nombre) else "anonymous"
 
-        # 3. Construcción del JSON con la estructura exacta de la imagen
         resultado.append({
             "id": str(r.ID_Rcrs),
             "featured": False,
-            "title": r.Dscrpcn or "Untitled",
-            "author": f"u/{nombre_autor}",  # Formato u/nombre
-            "community": "d/React Hub",  # Formato d/comunidad
+            "title": r.title or r.Dscrpcn or "Untitled",  # Prioriza el title nuevo
+            "author": f"u/{nombre_autor}",
+            "community": "d/React Hub",
             "time": "1h ago",
             "tags": [f"#{t.nombre}" for t in r.tags],
             "rating": None,
             "votes": 87,
             "comments": 15,
             "hasCode": False,
+            "markdown": r.markdown,  # Devuelve si es markdown
             "refs": [],
             "images": [img.url for img in r.imagenes]
         })

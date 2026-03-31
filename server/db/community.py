@@ -35,7 +35,7 @@ class Comunidad(db.Model):
     banner_cmnd = db.Column(db.Text)
     
     # Relaciones
-    tags = db.relationship('Tag', secondary='public.Comunidad_Tag', backref=db.backref('comunidades', lazy='dynamic'))
+    tags = db.relationship('Tag', secondary='public.Comunidad_Tag', backref=db.backref('comunidades', lazy='dynamic', overlaps="tag"),overlaps="tag")
     reglas = db.relationship('Regla_Comunidad', backref='comunidad', lazy=True, cascade="all, delete-orphan")
     miembros = db.relationship('Usuario_Comunidad', backref='comunidad', lazy=True)
 

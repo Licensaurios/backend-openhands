@@ -46,9 +46,15 @@ def post_resource():
             link:
               type: string
               description: URL del recurso
+            title:
+              type: string
+              description: Título del recurso
             descripcion:
               type: string
-              description: Breve descripción
+              description: Breve descripción (opcional)
+            markdown:
+              type: boolean
+              description: Indica si el recurso usa formato markdown
             tags:
               type: array
               items:
