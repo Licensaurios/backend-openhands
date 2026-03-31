@@ -64,6 +64,7 @@ def register_user(data):
     except Exception as e:
         db.session.rollback()
         return {"error": f"Error al guardar en base de datos: {str(e)}"}, 500
+
 def login_user(data):
     email = data.get("email")
     password = data.get("password")

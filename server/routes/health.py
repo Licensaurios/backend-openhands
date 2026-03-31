@@ -3,7 +3,7 @@ from flask import (
 )
 
 from server.controllers.health import get_server_status
-health_router = Blueprint('health', __name__, url_prefix='/healthz')
+health_router = Blueprint('health', __name__, url_prefix='/health')
 
 
 # /healthz/

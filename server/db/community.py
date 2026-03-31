@@ -2,7 +2,7 @@ from server.db.model import db
 import datetime
 import uuid
 
-# --- MODELO DE TAGS (NUEVO) ---
+# --- MODELO DE TAGS ---
 class Tag(db.Model):
     __tablename__ = 'Tag'
     __table_args__ = {"schema": "public"}
@@ -10,17 +10,16 @@ class Tag(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.Text, unique=True, nullable=False)
 
-# --- TABLA INTERMEDIA DE TAGS (NUEVO) ---
+# --- TABLA INTERMEDIA COMUNIDAD-TAG ---
 class Comunidad_Tag(db.Model):
     __tablename__ = 'Comunidad_Tag'
     __table_args__ = {"schema": "public"}
     
     ID_cmnd = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.Comunidad.iD_cmnd', ondelete="CASCADE"), primary_key=True)
     ID_Tag = db.Column(db.Integer, db.ForeignKey('public.Tag.id', ondelete="CASCADE"), primary_key=True)
-
-    # ESTA ES LA LÍNEA QUE FALTA:
     tag = db.relationship("Tag")
-# --- MODELO DE COMUNIDAD (MODIFICADO) ---
+
+# --- MODELO DE COMUNIDAD ---
 class Comunidad(db.Model):
     __tablename__ = 'Comunidad'
     __table_args__ = {"schema": "public"}
@@ -34,9 +33,35 @@ class Comunidad(db.Model):
     
     pfp_cmnd = db.Column(db.Text)
     banner_cmnd = db.Column(db.Text)
-
-    # Relación para obtener tags directamente: comunidad.tags
+    
+    # Relaciones
     tags = db.relationship('Tag', secondary='public.Comunidad_Tag', backref=db.backref('comunidades', lazy='dynamic'))
+    reglas = db.relationship('Regla_Comunidad', backref='comunidad', lazy=True, cascade="all, delete-orphan")
+    miembros = db.relationship('Usuario_Comunidad', backref='comunidad', lazy=True)
+
+# --- MODELO DE REGLAS ---
+class Regla_Comunidad(db.Model):
+    __tablename__ = 'regla_comunidad' 
+    __table_args__ = {"schema": "public"}
+    
+    ID_Regla = db.Column(db.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    ID_cmnd = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.Comunidad.iD_cmnd'), nullable=False)
+    Nombre_Regla = db.Column(db.String(100), nullable=False)
+    Dscrpcn = db.Column(db.Text)
+    Orden = db.Column(db.Integer, nullable=False)
+
+# --- TABLA INTERMEDIA (MIEMBROS CON ROLES Y SOFT DELETE) ---
+class Usuario_Comunidad(db.Model):
+    __tablename__ = 'Usuario_Comunidad'
+    __table_args__ = {"schema": "public"}
+    
+    ID_Usr = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.user.ID_Usr'), primary_key=True)
+    ID_cmnd = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.Comunidad.iD_cmnd'), primary_key=True)
+    Fch_ingreso = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
+    
+    # NUEVOS CAMPOS PARA ROLES Y CONTROL
+    Rol = db.Column(db.String(20), default='miembro', nullable=False) # 'fundador', 'moderador', 'miembro'
+    Is_Active = db.Column(db.Boolean, default=True, nullable=False)   # False = se salió de la comunidad
 
 # --- MODELO DE CHAT ---
 class Chat(db.Model):
@@ -57,12 +82,3 @@ class Registro_Chat(db.Model):
     ID_Chat = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.Chat.ID_Chat'), nullable=False)
     Dscrpcn = db.Column(db.String, nullable=False)
     Fch_envio = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
-
-# --- TABLA INTERMEDIA (MIEMBROS) ---
-class Usuario_Comunidad(db.Model):
-    __tablename__ = 'Usuario_Comunidad'
-    __table_args__ = {"schema": "public"}
-    
-    ID_Usr = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.user.ID_Usr'), primary_key=True)
-    ID_cmnd = db.Column(db.UUID(as_uuid=True), db.ForeignKey('public.Comunidad.iD_cmnd'), primary_key=True)
-    Fch_ingreso = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
