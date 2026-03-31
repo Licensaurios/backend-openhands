@@ -1,65 +1,70 @@
-from flask import (
-    Blueprint, jsonify
-)
-from sqlalchemy.orm import Session
+from flask import Blueprint
+from flask_security import auth_required
 
-from server.controllers.health import get_server_status
-from server.db.resource import Recurso
-from server.db.model import get_db 
+from server.controllers.resource import create_resource, get_paginated_resources
+
 resource_router = Blueprint('resources', __name__, url_prefix='/resources')
 
-def recurso_to_dict(recurso: Recurso) -> dict:
-    return {
-        "id": str(recurso.ID_Rcrs),
-        "link": recurso.Link,
-        "id_usuario": str(recurso.ID_Usr),
-        "descripcion": recurso.Dscrpcn,
-        "fecha_creacion": recurso.Fch_plcn.isoformat(),
-        "id_publicacion": str(recurso.ID_pblcn) if recurso.ID_pblcn else None,
-    }
-
-def get_all_recursos(db: Session) -> list[dict]:
-   recursos = db.query(Recurso).all()
-   return [recurso_to_dict(r) for r in recursos]
-
-@resource_router.route("/")
+@resource_router.route("/", methods=["GET"])
 def get_resources():
     """
-    Obtener lista de recursos
+    Obtener lista de recursos (Paginada y filtrada)
     ---
     tags:
       - Recursos
+    parameters:
+      - name: page
+        in: query
+        type: integer
+        description: Número de página (por defecto 1)
+      - name: tags
+        in: query
+        type: string
+        description: Etiquetas separadas por coma (ej. python,backend)
     responses:
       200:
-        description: Lista de recursos
+        description: Lista paginada de recursos formateada para el Frontend
+    """
+    return get_paginated_resources()
+
+@resource_router.route("/", methods=["POST"])
+@auth_required()
+def post_resource():
+    """
+    Crear un nuevo recurso
+    ---
+    tags:
+      - Recursos
+    parameters:
+      - in: body
+        name: body
         schema:
           type: object
+          required:
+            - link
           properties:
-            resources:
+            link:
+              type: string
+              description: URL del recurso
+            descripcion:
+              type: string
+              description: Breve descripción
+            tags:
               type: array
               items:
-                properties:
-                  id:
-                    type: string
-                  link:
-                    type: string
-                  descripcion:
-                    type: string
-            count:
-              type: integer
+                type: string
+              description: Lista de etiquetas
+            images:
+              type: array
+              items:
+                type: string
+              description: Arreglo de URLs de imágenes alojadas (ej. Cloudinary)
+    responses:
+      201:
+        description: Recurso e imágenes creados exitosamente
+      400:
+        description: Error de validación
+      401:
+        description: No autorizado (Falta iniciar sesión)
     """
-    db = next(get_db())
-    recursos = get_all_recursos(db)
-    db.close()
-    return jsonify(
-        {
-            "resources": recursos,
-            "count": len(recursos)
-        }
-    )
-
-
-
-
-
-
+    return create_resource()

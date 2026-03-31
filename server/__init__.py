@@ -6,23 +6,30 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_security import Security, SQLAlchemyUserDatastore
 from flasgger import Swagger
+from dotenv import load_dotenv
 
-from server.extensiones import mail
+# 1. IMPORTACIONES DE TU PROYECTO
 from server.db.model import Role, User, db
+from server.extensiones import mail  # <--- ESTA FALTABA
 from server.routes.auth import auth_router
 from server.routes.health import health_router
 from server.routes.resource import resource_router
+from server.routes.community import community_router
 
+# Configuración de Logging
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
+load_dotenv()
+
+# Configuración de Swagger
 swagger_config = {
     "headers": [],
     "specs": [
         {
             "endpoint": "apispec",
             "route": "/apispec.json",
-            "rule_filter": lambda rule: True,  # incluir todos los endpoints
+            "rule_filter": lambda rule: True,
             "model_filter": lambda tag: True,
         }
     ],
@@ -31,70 +38,54 @@ swagger_config = {
     "specs_route": "/docs/"
 }
 
-swagger_template = {
-    "info": {
-        "title": "OpenHands API",
-        "version": "1.0.0",
-        "description": "Documentación de la API de la plataforma OpenHands"
-    },
-    "host": "localhost:5000",
-    "basePath": "/",
-    "schemes": ["http", "https"],
-}
-
 def init_webapp(config_path: str, test: bool = False) -> Flask:
     app = Flask(__name__)
     
-    abs_config_path = os.path.abspath(config_path)
-
-    Swagger(app, config=swagger_config, template=swagger_template)
-    if not test:
-        if not os.path.exists(abs_config_path):
-            log.error(f"Archivo de configuración no encontrado en: {abs_config_path}")
-            sys.exit(1)
-            
-        try:
+    database_uri = os.environ.get("DATABASE_URL")
+    
+    if not test and not database_uri:
+        abs_config_path = os.path.abspath(config_path)
+        if os.path.exists(abs_config_path):
             config = ConfigObj(abs_config_path, encoding='utf8')
             database_uri = config["webapp"]["database_uri"]
-        except Exception as e:
-            log.error(f"Error al procesar config: {e}")
+        else:
+            log.error("No se encontró DATABASE_URL en .env ni dev.config")
             sys.exit(1)
-    else:
-        database_uri = "sqlite://"
+    elif test:
+        database_uri = "sqlite:///:memory:"
 
     app.config.update(
         SQLALCHEMY_DATABASE_URI=database_uri,
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
-        
-        SECRET_KEY=os.environ.get("SECRET_KEY", "abc1234_dev_key"),
+        SECRET_KEY=os.environ.get("SECRET_KEY", "dev_key_fallback"),
+        SECURITY_PASSWORD_SALT=os.environ.get("SECURITY_PASSWORD_SALT", "salt_fallback"),
         SECURITY_PASSWORD_HASH="pbkdf2_sha256",
-        SECURITY_PASSWORD_SALT="salt_dev",
         WTF_CSRF_ENABLED=False,
-
         MAIL_SERVER='smtp.gmail.com',
         MAIL_PORT=587,
         MAIL_USE_TLS=True,
-        MAIL_USERNAME='openhands.path@gmail.com',
-        MAIL_PASSWORD='bcosnfdfgdmkqbcq',  
-        MAIL_DEFAULT_SENDER='Soporte OpenHands <openhands.path@gmail.com>'
+        MAIL_USERNAME=os.environ.get("MAIL_USERNAME"),
+        MAIL_PASSWORD=os.environ.get("MAIL_PASSWORD"),
+        MAIL_DEFAULT_SENDER=os.environ.get("MAIL_DEFAULT_SENDER")
     )
 
     db.init_app(app)
     mail.init_app(app)
-    
+    Swagger(app, config=swagger_config) 
+
     app.register_blueprint(auth_router)
     app.register_blueprint(health_router)
     app.register_blueprint(resource_router)
+    app.register_blueprint(community_router) 
 
     user_datastore = SQLAlchemyUserDatastore(db, User, Role)
     Security(app, user_datastore)
 
     with app.app_context():
-        if "postgresql" in app.config["SQLALCHEMY_DATABASE_URI"]:
+        uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+        if "postgresql" in uri or "postgres" in uri:
             log.info("Sincronizando modelos con Supabase...")
-            db.create_all()
         else:
             log.warning("No se detectó Postgres, omitiendo create_all()")
-
 
     return app

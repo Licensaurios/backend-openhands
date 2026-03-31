@@ -2,10 +2,6 @@
 activate
 *-venv
 
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-
 # C extensions
 *.so
 
@@ -66,3 +62,20 @@ docs/_build/
 
 # Docker
 .server-container-id
+
+# Secretos y Entorno
+.env
+.env.local
+config/dev.config
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Logs y PIDs (del script init.d)
+var/run/*.pid
+var/log/*.log
+var/log/*.err

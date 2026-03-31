@@ -77,8 +77,6 @@ def login_user(data):
         
         security_login_user(user) 
         
-        # --- SOLUCIÓN AL UNIQUE VIOLATION ---
-        # Borramos cualquier token 'default' previo de este usuario
         OAuth2Token.query.filter_by(user_id=user.id, name="default").delete()
         # ------------------------------------
 
@@ -106,8 +104,6 @@ def login_user(data):
                 }
             }
             
-            # --- SOLUCIÓN AL TYPEERROR ---
-            # Siempre devolvemos el objeto response directamente
             response = make_response(jsonify(response_data), 200)
 
             response.set_cookie(
