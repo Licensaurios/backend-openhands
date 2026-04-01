@@ -1,7 +1,7 @@
 from flask import Blueprint
 from server.controllers.community import (
     create_community,
-    get_my_communities,
+    get_user_communities, 
     get_community_detail,
     update_community,
     delete_community,
@@ -18,14 +18,21 @@ from server.controllers.community import (
     delete_community_rule,
     update_community_rule,
     get_community_post_count,
-    get_community_feed
+    get_community_feed,
+    get_popular_tags
+
 )
 
-community_router = Blueprint('community', __name__, url_prefix='/api/community')
+community_router = Blueprint('commun        ity', __name__, url_prefix='/api/community')
 
+
+community_router.route('/my', methods=['GET'])(get_user_communities)
+
+community_router.route('/user/<uuid:user_id>', methods=['GET'])(get_user_communities)
+
+    
 # --- CRUD Y BÚSQUEDA ---
 community_router.route('/create', methods=['POST'])(create_community)
-community_router.route('/my', methods=['GET'])(get_my_communities)
 community_router.route('/search', methods=['GET'])(search_communities)
 community_router.route('/trending', methods=['GET'])(get_trending_communities)
 community_router.route('/<uuid:comm_id>', methods=['GET'])(get_community_detail)
@@ -50,8 +57,8 @@ community_router.route('/<uuid:comm_id>/rules/create', methods=['POST'])(add_com
 community_router.route('/rules/delete/<uuid:regla_id>', methods=['DELETE'])(delete_community_rule)
 community_router.route('/rules/edit/<uuid:regla_id>', methods=['PUT'])(update_community_rule)
 
-# --- ACTIVIDAD DE LA COMUNIDAD ---
-# Conteo rápido de publicaciones
+# --- ESTADÍSTICAS Y FEED ---
 community_router.route('/<uuid:comm_id>/posts/count', methods=['GET'])(get_community_post_count)
-# Feed de noticias/publicaciones de la comunidad
 community_router.route('/<uuid:comm_id>/feed', methods=['GET'])(get_community_feed)
+
+community_router.route('/tags/trending', methods=['GET'])(get_popular_tags)

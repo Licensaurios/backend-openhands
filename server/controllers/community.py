@@ -2,18 +2,20 @@ import datetime
 import uuid
 import logging
 import re 
-from server.db.model import Publicacion
+from datetime import datetime, timezone 
+from server.db.model import db, Publicacion, Like_pblcn, Post_Guardado
 from flask import request, jsonify
 from flask_security import current_user, auth_required
-from sqlalchemy import or_, func
-from server.db.model import db 
+from sqlalchemy import or_, func, desc
 from sqlalchemy.orm import joinedload
-from server.db.community import Comunidad, Chat, Usuario_Comunidad, Tag, Comunidad_Tag
+from server.db.community import Comunidad, Chat, Usuario_Comunidad, Tag, Comunidad_Tag, Regla_Comunidad
 
+from server.controllers.post import format_post_output
 log = logging.getLogger(__name__)
 
 def _handle_community_tags(comm_id, tags_list):
-    """Maneja etiquetas permitiendo ÚNICAMENTE letras y números."""
+    """Limpia etiquetas permitiendo letras y números (ej: python3, c++, java)."""
+    # Borramos relaciones viejas para actualizar
     Comunidad_Tag.query.filter_by(ID_cmnd=comm_id).delete()
     
     if not tags_list:
@@ -22,106 +24,117 @@ def _handle_community_tags(comm_id, tags_list):
     tags_unicos = set([t.lower().strip() for t in tags_list if t])
 
     for t_name in tags_unicos:
-        t_name = re.sub(r'[^a-z0-9]', '', t_name)
-        if not t_name: 
+        t_clean = re.sub(r'[^a-z0-9]', '', t_name) 
+        
+        if not t_clean: 
             continue
         
-        tag_obj = Tag.query.filter_by(nombre=t_name).first()
+        tag_obj = Tag.query.filter_by(nombre=t_clean).first()
         if not tag_obj:
-            tag_obj = Tag(nombre=t_name)
+            tag_obj = Tag(nombre=t_clean)
             db.session.add(tag_obj)
-            db.session.flush() 
-            
+            db.session.flush()             
         relacion = Comunidad_Tag(ID_cmnd=comm_id, ID_Tag=tag_obj.id)
         db.session.add(relacion)
-
-
-# --- CREAR COMUNIDAD ---
 @auth_required()
 def create_community():
     data = request.get_json()
+    
+    # Extraer datos del JSON de Bruno
     nombre = data.get('nombre')
     descripcion = data.get('descripcion')
-    pfp_url = data.get('pfp_url')    
-    banner_url = data.get('banner_url') 
-    tags_recibidos = data.get('tags', [])
+    topic_id = data.get('topic') 
+    pfp = data.get('pfp_url')
+    banner = data.get('banner_url')
+    reglas_data = data.get('reglas', [])
 
-    if not nombre:
-        return jsonify({"error": "El nombre es obligatorio"}), 400
-
-    comm_id = uuid.uuid4()
-    nueva_comunidad = Comunidad(
-        iD_cmnd=comm_id,
-        Name_cmnd=nombre,
-        Dscrpcn=descripcion, 
-        ID_Admin=current_user.id, # Sigue siendo el Admin principal
-        pfp_cmnd=pfp_url,
-        banner_cmnd=banner_url,
-        active=True, 
-        Fch_crcn=datetime.datetime.now(datetime.timezone.utc)
-    )
+    if not nombre or not topic_id:
+        return jsonify({"error": "Faltan campos obligatorios: nombre y topic"}), 400
 
     try:
-        db.session.add(nueva_comunidad)
-        _handle_community_tags(comm_id, tags_recibidos)
-        db.session.add(Chat(ID_Chat=uuid.uuid4(), iD_cmnd=comm_id))
+        # Usando los nombres EXACTOS de tu clase Comunidad
+        nueva_cmnd = Comunidad(
+            Name_cmnd=nombre,
+            Dscrpcn=descripcion,
+            id_tema=topic_id,
+            ID_Admin=current_user.id, # OBLIGATORIO según tu modelo
+            pfp_cmnd=pfp,             # En minúsculas según tu modelo
+            banner_cmnd=banner,       # En minúsculas según tu modelo
+            Fch_crcn=datetime.utcnow(),
+            active=True
+        )
         
-        db.session.add(Usuario_Comunidad(
-            ID_Usr=current_user.id, 
-            ID_cmnd=comm_id, 
-            Rol='fundador',    
-            Is_Active=True,     
-            Fch_ingreso=datetime.datetime.now(datetime.timezone.utc)
-        ))
+        db.session.add(nueva_cmnd)
+        db.session.flush() 
+
+        # Crear el registro en Usuario_Comunidad (Rol Fundador)
+        vinculo = Usuario_Comunidad(
+            ID_Usr=current_user.id,
+            ID_cmnd=nueva_cmnd.iD_cmnd,
+            Rol='fundador',
+            Is_Active=True
+        )
+        db.session.add(vinculo)
+
+        # Crear las reglas usando el modelo Regla_Comunidad
+        for r in reglas_data:
+            nueva_regla = Regla_Comunidad(
+                ID_cmnd=nueva_cmnd.iD_cmnd, # El modelo usa ID_cmnd (mayus ID)
+                nombre_regla=r.get('nombre'),
+                dscrpcn=r.get('descripcion'),
+                orden=r.get('orden', 0)
+            )
+            db.session.add(nueva_regla)
 
         db.session.commit()
-        return jsonify({"msg": "Comunidad creada exitosamente", "id": str(comm_id)}), 201
+
+        return jsonify({
+            "msg": "Comunidad UAS creada con éxito",
+            "community_id": str(nueva_cmnd.iD_cmnd)
+        }), 201
+
     except Exception as e:
         db.session.rollback()
-        log.error(f"Error en creación: {e}")
-        return jsonify({"error": "Error interno"}), 500
-
-# --- MIS COMUNIDADES ---
+        print(f"ERROR EN MUCU: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 @auth_required()
-def get_my_communities():
+def get_user_communities(user_id=None):
+    target_id = user_id or current_user.id
+    
     try:
-        mis_comunidades = (
-            db.session.query(Comunidad)
+        query = (
+            db.session.query(Comunidad, Usuario_Comunidad.Rol)
             .join(Usuario_Comunidad, Comunidad.iD_cmnd == Usuario_Comunidad.ID_cmnd)
-            .filter(Usuario_Comunidad.ID_Usr == current_user.id)
-            .filter(Usuario_Comunidad.Is_Active == True) # <--- Solo activos
-            .filter(Comunidad.active == True)  
+            .filter(Usuario_Comunidad.ID_Usr == target_id)
+            .filter(Usuario_Comunidad.Is_Active == True)
+            .filter(Comunidad.active == True)
             .all()
         )
-    
         resultado = []
-        for c in mis_comunidades:
-            membresia = next((m for m in c.miembros if str(m.ID_Usr) == str(current_user.id)), None)
-            
+        for comunidad, rol_en_membresia in query:
             resultado.append({
-                "id_comunidad": str(c.iD_cmnd),
-                "nombre": c.Name_cmnd,
-                "descripcion": c.Dscrpcn,
-                "pfp_url": c.pfp_cmnd,
-                "banner_url": c.banner_cmnd,
-                "tags": [t.nombre for t in c.tags],
-                "rol": membresia.Rol if membresia else "miembro",
-                "es_admin": str(c.ID_Admin) == str(current_user.id),
-                "fecha_creacion": c.Fch_crcn.strftime('%Y-%m-%d %H:%M:%S')
+                "id_comunidad": str(comunidad.iD_cmnd),
+                "nombre": comunidad.Name_cmnd,
+                "display_name": f"c/{comunidad.Name_cmnd.replace(' ', '').lower()}",
+                "descripcion": comunidad.Dscrpcn,
+                "pfp_url": comunidad.pfp_cmnd,
+                "banner_url": comunidad.banner_cmnd,
+                "tags": [t.nombre for t in comunidad.tags],
+                "rol": rol_en_membresia or "miembro",
+                "es_admin": str(comunidad.ID_Admin) == str(target_id),
+                "miembros_count": getattr(comunidad, 'total_miembros', 0),
+                "fecha_creacion": comunidad.Fch_crcn.strftime('%Y-%m-%d %H:%M:%S') if comunidad.Fch_crcn else None
             })
-
         return jsonify(resultado), 200
     except Exception as e:
-        log.error(f"Error al listar comunidades: {e}")
-        return jsonify({"error": "Error al obtener comunidades"}), 500
-
-# --- OBTENER INFORMACIÓN COMPLETA DE LA COMUNIDAD ---
+        log.error(f"Error al listar comunidades para {target_id}: {e}")
+        return jsonify({"error": "No se pudo obtener la lista de comunidades"}), 500
 @auth_required()
 def get_community_detail(comm_id):
     try:
         comunidad = Comunidad.query.get_or_404(comm_id)
-        from server.db.community import Regla_Comunidad # Importa si es necesario
-        reglas_raw = Regla_Comunidad.query.filter_by(ID_cmnd=comm_id).order_by(Regla_Comunidad.Orden).all()
+        
+        reglas_raw = Regla_Comunidad.query.filter_by(ID_cmnd=comm_id).order_by(Regla_Comunidad.orden).all()
         miembros_activos = Usuario_Comunidad.query.filter_by(
             ID_cmnd=comm_id, 
             Is_Active=True
@@ -133,7 +146,8 @@ def get_community_detail(comm_id):
 
         for m in miembros_activos:
             conteo_miembros += 1
-            user_info = {"id_user": str(m.ID_Usr), "fecha_unido": m.Fch_ingreso.strftime('%Y-%m-%d')}
+            fecha = m.Fch_ingreso.strftime('%Y-%m-%d') if m.Fch_ingreso else "N/A"
+            user_info = {"id_user": str(m.ID_Usr), "fecha_unido": fecha}
             
             if m.Rol == 'fundador':
                 fundador = user_info
@@ -147,30 +161,29 @@ def get_community_detail(comm_id):
                 "descripcion": comunidad.Dscrpcn,
                 "pfp": comunidad.pfp_cmnd,
                 "banner": comunidad.banner_cmnd,
-                "fecha_creacion": comunidad.Fch_crcn.strftime('%Y-%m-%d'),
-                "id_admin_principal": str(comunidad.ID_Admin), # Sincronizado con fundador
+                "fecha_creacion": comunidad.Fch_crcn.strftime('%Y-%m-%d') if comunidad.Fch_crcn else "N/A",
+                "id_admin_principal": str(comunidad.ID_Admin), 
                 "estado_activa": comunidad.active
             },
             "administracion": {
                 "fundador": fundador,
                 "moderadores": moderadores,
                 "total_miembros": conteo_miembros,
-                "limite_mods": 4 # Dato informativo para el front
+                "limite_mods": 4
             },
             "reglas": [
                 {
-                    "nombre": r.Nombre_Regla,
-                    "descripcion": r.Dscrpcn,
-                    "orden": r.Orden
+                    "nombre": r.nombre_regla, 
+                    "descripcion": r.dscrpcn,
+                    "orden": r.orden
                 } for r in reglas_raw
             ],
             "tags": [t.nombre for t in comunidad.tags]
         }), 200
 
     except Exception as e:
-        log.error(f"Error al obtener info de comunidad {comm_id}: {e}")
-        return jsonify({"error": "No se pudo cargar la información de la comunidad"}), 500
-
+        print(f"--- ERROR  (get_community_detail) ---: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 # --- EDITAR COMUNIDAD ---
 @auth_required()
@@ -214,10 +227,10 @@ def delete_community(comm_id):
         log.error(f"Error al deshabilitar: {e}")
         return jsonify({"error": "Error interno al procesar la solicitud"}), 500
 
-
 # --- UNIRSE A COMUNIDAD ---
 @auth_required()
 def join_community(comm_id):
+    
     comunidad = Comunidad.query.get_or_404(comm_id)
     if not comunidad.active:
         return jsonify({"error": "Esta comunidad ya no está disponible"}), 400
@@ -233,7 +246,7 @@ def join_community(comm_id):
         else:
             existente.Is_Active = True
             existente.Rol = 'miembro' 
-            existente.Fch_ingreso = datetime.datetime.now(datetime.timezone.utc)
+            existente.Fch_ingreso = datetime.now(timezone.utc)
             db.session.commit()
             return jsonify({"msg": "Has reingresado a la comunidad"}), 200
 
@@ -242,18 +255,19 @@ def join_community(comm_id):
         ID_cmnd=comm_id,
         Rol='miembro',
         Is_Active=True,
-        Fch_ingreso=datetime.datetime.now(datetime.timezone.utc)
+        Fch_ingreso=datetime.now(timezone.utc)
     )
 
     try:
         db.session.add(nuevo_miembro)
+        comunidad.total_miembros += 1 
+        
         db.session.commit()
         return jsonify({"msg": "Te has unido a la comunidad con éxito"}), 201
     except Exception as e:
         db.session.rollback()
+        print(f"Error al unirse: {str(e)}")
         return jsonify({"error": "Error al unirse"}), 500
-
-# cambiar de false a true
 # --- SALIR DE COMUNIDAD ---
 @auth_required()
 def leave_community(comm_id):
@@ -298,18 +312,17 @@ def leave_community(comm_id):
 
 # --- BUSCADOR ---
 def search_communities():
-    search_query = request.args.get('q', '')
+    search_query = request.args.get('q', '').strip().lower()
     page = int(request.args.get('page', 1))
     per_page = 10 
 
     stmt = Comunidad.query.filter(Comunidad.active == True)
 
     if search_query:
-        formatted_query = f'%{search_query}%'
         stmt = stmt.join(Comunidad_Tag, isouter=True).join(Tag, isouter=True).filter(
             or_(
-                Comunidad.Name_cmnd.ilike(formatted_query),
-                Tag.nombre.ilike(formatted_query)
+                Comunidad.Name_cmnd.ilike(f'%{search_query}%'),
+                Tag.nombre.ilike(f'%{search_query}%')
             )
         ).distinct()
 
@@ -317,16 +330,17 @@ def search_communities():
     comunidades = stmt.options(joinedload(Comunidad.tags))\
                   .limit(per_page)\
                   .offset((page - 1) * per_page).all()
+                  
     resultado = []
     for c in comunidades:
-        total_miembros = Usuario_Comunidad.query.filter_by(ID_cmnd=c.iD_cmnd).count()
         resultado.append({
             "id": str(c.iD_cmnd),
             "nombre": c.Name_cmnd,
+            "display_name": f"c/{c.Name_cmnd.replace(' ', '').lower()}",
             "descripcion": c.Dscrpcn,
             "tags": [t.nombre for t in c.tags],
             "pfp": c.pfp_cmnd,
-            "miembros": total_miembros
+            "miembros": getattr(c, 'total_miembros', 0) 
         })
 
     return jsonify({
@@ -335,8 +349,6 @@ def search_communities():
         "page": page,
         "has_more": total > (page * per_page)
     }), 200
-
-
 # --- OBTENER LISTA DE MIEMBROS ---
 @auth_required()
 def get_community_members(comm_id):
@@ -599,17 +611,21 @@ def delete_community_rule(regla_id):
 @auth_required()
 def get_community_rules(comm_id):
     try:
-        reglas = Regla_Comunidad.query.filter_by(ID_cmnd=comm_id).order_by(Regla_Comunidad.Orden).all()
+        reglas = Regla_Comunidad.query.filter_by(ID_cmnd=comm_id).order_by(Regla_Comunidad.orden).all()
+        
+      
         return jsonify([
             {
-                "id_regla": str(r.ID_Regla),
-                "nombre": r.Nombre_Regla,
-                "descripcion": r.Dscrpcn,
-                "orden": r.Orden
+                "id_regla": str(r.id_regla),
+                "nombre": r.nombre_regla,
+                "descripcion": r.dscrpcn,
+                "orden": r.orden
             } for r in reglas
         ]), 200
+        
     except Exception as e:
-        return jsonify({"error": "Error al obtener reglas"}), 500
+        print(f"Error en GET /rules: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 # --- EDITAR REGLA ---
 @auth_required()
@@ -657,11 +673,10 @@ def update_community_rule(regla_id):
 @auth_required()
 def get_community_post_count(comm_id):
     try:
-        from server.db.community import Publicacion 
 
         total_posts = Publicacion.query.filter_by(
             ID_cmnd=comm_id,
-            active=True # Solo contamos los que no han sido borrados
+            active=True
         ).count()
 
         return jsonify({
@@ -672,7 +687,7 @@ def get_community_post_count(comm_id):
     except Exception as e:
         log.error(f"Error al contar posts: {e}")
         return jsonify({"error": "No se pudo obtener el conteo de publicaciones"}), 500
-#
+    #
 
 @auth_required()
 def get_community_feed(comm_id):
@@ -682,37 +697,53 @@ def get_community_feed(comm_id):
             active=True
         ).order_by(Publicacion.Fch_pblcn.desc()).all()
 
+        if not publicaciones:
+            return jsonify([]), 200
+
+        post_ids = [p.ID_pblcn for p in publicaciones]
+        
+        likes_usuario = set(
+            row.ID_pblcn for row in Like_pblcn.query.filter(
+                Like_pblcn.ID_Usr == current_user.id,
+                Like_pblcn.ID_pblcn.in_(post_ids)
+            ).all()
+        )
+        
+        guardados_usuario = set(
+            row.ID_pblcn for row in Post_Guardado.query.filter(
+                Post_Guardado.ID_Usr == current_user.id,
+                Post_Guardado.ID_pblcn.in_(post_ids)
+            ).all()
+        )
+
         feed = []
         for p in publicaciones:
-            num_likes = p.likes.count()
+            post_data = format_post_output(p)
             
-            user_liked = Like_Post.query.filter_by(
-                ID_Usr=current_user.id, 
-                ID_pblcn=p.ID_pblcn
-            ).first() is not None
-
-            user_saved = Post_Guardado.query.filter_by(
-                ID_Usr=current_user.id, 
-                ID_pblcn=p.ID_pblcn
-            ).first() is not None
-
-            feed.append({
-                "id_post": str(p.ID_pblcn),
-                "titulo": p.Titulo,
-                "contenido": p.Dscrpcn,
-                "fecha": p.Fch_pblcn.isoformat(),
-                "autor_id": str(p.ID_Usr),
-                "stats": {
-                    "likes": num_likes,
-                    "karma": p.Votos_Karma
-                },
-                "interaccion_usuario": {
-                    "liked": user_liked,
-                    "saved": user_saved
-                }
-            })
+            post_data["interaccion_usuario"] = {
+                "liked": p.ID_pblcn in likes_usuario,
+                "saved": p.ID_pblcn in guardados_usuario
+            }
+            
+            feed.append(post_data)
 
         return jsonify(feed), 200
 
     except Exception as e:
-        return jsonify({"error": f"Error al cargar el feed: {str(e)}"}), 500
+        print(f"Error en get_community_feed: {str(e)}")
+        return jsonify({"error": "Error interno al cargar el feed"}), 500
+
+def get_popular_tags():
+    """Retorna los 10 tags más usados en comunidades activas."""
+    popular_tags = (
+        db.session.query(Tag.nombre, func.count(Comunidad_Tag.ID_cmnd).label('total'))
+        .join(Comunidad_Tag)
+        .join(Comunidad)
+        .filter(Comunidad.active == True)
+        .group_by(Tag.nombre)
+        .order_by(desc('total'))
+        .limit(10)
+        .all()
+    )
+    
+    return jsonify([{"tag": t[0], "count": t[1]} for t in popular_tags]), 200

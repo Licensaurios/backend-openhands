@@ -1,5 +1,6 @@
 import uuid
 import os
+
 import logging
 import sys
 import datetime
@@ -42,14 +43,12 @@ def get_db():
     finally:
         db_session.close()
 
-# --- TABLAS DE RELACIÓN ---
 
 roles_users = db.Table('roles_users',
     db.Column('ID_Usr', UUID(as_uuid=True), db.ForeignKey('public.user.ID_Usr'), primary_key=True),
     db.Column('id_rol', db.Integer(), db.ForeignKey('public.role.id_rol'), primary_key=True),
     schema='public'
 )   
-# --- MODELOS DE SEGURIDAD ---
 
 class Role(db.Model, RoleMixin):
     __tablename__ = "role"
@@ -89,9 +88,7 @@ class OAuth2Token(db.Model):
     
     user = db.relationship("User", back_populates="tokens")
 
-# --- MODELOS DE INTERACCIÓN ---
-
-class Like_Post(db.Model):
+class Like_pblcn(db.Model):
     __tablename__ = 'Like_pblcn' 
     __table_args__ = {"schema": "public"}
     
@@ -117,11 +114,16 @@ class Publicacion(db.Model):
     ID_Usr = db.Column(UUID(as_uuid=True), db.ForeignKey('public.user.ID_Usr'), nullable=True) 
     ID_cmnd = db.Column(UUID(as_uuid=True), db.ForeignKey('public.Comunidad.iD_cmnd'), nullable=True)
     ID_Pryct = db.Column(UUID(as_uuid=True), nullable=True)
+    
     Titulo = db.Column(db.Text, nullable=False, default='Publicación sin título')
     Dscrpcn = db.Column(db.Text)
     Fch_pblcn = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
     Votos_Karma = db.Column(db.Integer, default=0)
-
+    
+    # --- COLUMNAS PARA PRODUCCIÓN (VINCULADAS A TRIGGERS) ---
+    total_likes = db.Column(db.Integer, default=0)
+    total_comments = db.Column(db.Integer, default=0)
+    active = db.Column(db.Boolean(), default=True, nullable=False)
     Extra_Metadata = db.Column(JSONB, default={
         "is_anonymous": False,
         "hasCode": False,
@@ -130,6 +132,8 @@ class Publicacion(db.Model):
         "user_removed": False
     })
 
+    autor = db.relationship("User", backref=db.backref("publicaciones", lazy=True))
+    comunidad = db.relationship("Comunidad", backref=db.backref("publicaciones", lazy=True))
 
 class Comentario(db.Model):
     __tablename__ = 'Comentario'
@@ -143,3 +147,25 @@ class Comentario(db.Model):
     Fch_creacion = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
     
     Respuesta_A_ID = db.Column(UUID(as_uuid=True), db.ForeignKey('public.Comentario.ID_Cmmnt'), nullable=True)
+    
+    autor = db.relationship("User", backref=db.backref("comentarios", lazy=True))
+
+class Post_Tag(db.Model):
+    __tablename__ = 'recurso_tag'
+    __table_args__ = {"schema": "public"}
+    
+    ID_pblcn = db.Column('ID_Rcrs', UUID(as_uuid=True), db.ForeignKey('public.Publicacion.ID_pblcn'), primary_key=True)
+    
+    ID_Tag = db.Column('id', db.Integer, db.ForeignKey('public.Tag.id'), primary_key=True)
+class Publicacion_Tema(db.Model):
+    __tablename__ = 'Publicacion_Tema'
+    __table_args__ = {"schema": "public"}
+    
+    ID_pblcn = db.Column('ID_pblcn', UUID(as_uuid=True), db.ForeignKey('public.Publicacion.ID_pblcn'), primary_key=True)
+    
+    id_tema = db.Column('id_tema', UUID(as_uuid=True), db.ForeignKey('public.tema.id_tema'), primary_key=True)
+class Tema(db.Model):
+    __tablename__ = 'tema'
+    __table_args__ = {"schema": "public"}
+    id_tema = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    dscrpcn = db.Column(db.Text, nullable=False)
