@@ -196,6 +196,7 @@ def get_paginated_resources():
         for line in r.codelines:
             dic = {
                'text': line,
+               'color': '#fff'
             }
             code.append(dic)
 
