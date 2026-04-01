@@ -1,13 +1,36 @@
 import uuid
-import datetime
+from datetime import datetime, timezone
 import logging
 from flask import request, jsonify
 from flask_security import current_user
 from server.db.model import db, User
 from server.db.resource import Recurso, Recurso_Tag, RecursoImg
-from server.db.community import Tag
+from server.db.community import Tag, Comunidad
 
 log = logging.getLogger(__name__)
+
+def is_valid_uuid(uuid_to_test):
+    """
+    Check if uuid_to_test is a valid UUID.
+    """
+    try:
+        uuid.UUID(uuid_to_test)
+        return True
+    except ValueError:
+        return False
+
+def get_time_ago(seconds):
+    seconds = int(seconds)
+    if seconds < 60:
+        return f"{seconds}s ago"
+    elif seconds < 3600:
+        return f"{seconds // 60}m ago"
+    elif seconds < 86400:
+        return f"{seconds // 3600}h ago"
+    elif seconds < 2592000:
+        return f"{seconds // 86400}d ago"
+    else:
+        return f"{seconds // 2592000}mo ago"
 
 
 def _handle_resource_tags(recurso_id, tags_list):
@@ -43,11 +66,31 @@ def create_resource():
     refs               = data.get('refs', [])
     code_lines         = data.get('codeLines', [])
     code_lang          = data.get('codeLang', None)
+    usuario_id         = data.get('user_id', None) 
 
     if not link:
         return jsonify({"error": "El link es obligatorio"}), 400
 
-    usuario_id_real = current_user.id
+    # usuario_id_real = current_user.id
+    if not title:
+        return jsonify({"error": "El titulo es obligatorio"}), 400
+
+    if not usuario_id:
+        return jsonify({"error": "El user_id es obligatorio"}), 400
+ 
+    if not is_valid_uuid(usuario_id):
+        return jsonify({"error": "El id del usuario es invalido"}), 400
+
+       # usuario_id_real = 
+
+    user_exists = db.session.query(
+        db.session.query(User).filter(User.id == usuario_id).exists()
+    ).scalar() 
+
+    if not user_exists:
+        msg = f"El usuario con el id {usuario_id} no existe!"
+        return jsonify({"error": msg }) 
+
     recurso_id = uuid.uuid4()
 
     nuevo_recurso = Recurso(
@@ -56,8 +99,8 @@ def create_resource():
         Dscrpcn   = descripcion,
         title     = title,
         markdown  = is_markdown,
-        ID_Usr    = usuario_id_real,
-        Fch_plcn  = datetime.datetime.now(datetime.timezone.utc),
+        ID_Usr    = usuario_id,
+        Fch_plcn  = datetime.now(datetime.timezone.utc),
         featured  = is_featured,
         rating    = rating,
         votes     = votes,
@@ -81,7 +124,7 @@ def create_resource():
         return jsonify({
             "msg": "Recurso creado exitosamente",
             "id": str(recurso_id),
-            "usuario_asignado": str(usuario_id_real)
+            "usuario_asignado": str(usuario_id)
         }), 201
 
     except Exception as e:
@@ -136,13 +179,21 @@ def get_paginated_resources():
         usuario      = User.query.get(r.ID_Usr)
         nombre_autor = usuario.nombre if (usuario and usuario.nombre) else "anonymous"
 
+        comunidad = Comunidad.query.get(r.community_id)
+        nombre_comunidad = comunidad.Name_cmnd
+        
+        now = datetime.now(timezone.utc)
+        diff = now - r.Fch_plcn  # timedelta
+        seconds = diff.total_seconds()
+        time_ago = get_time_ago(seconds)
+    
         resultado.append({
             "id":        str(r.ID_Rcrs),
             "featured":  r.featured  or False,
             "title":     r.title or r.Dscrpcn or "Untitled",
             "author":    f"u/{nombre_autor}",
-            "community": "d/React Hub",
-            "time":      "1h ago",
+            "community": f"c/{nombre_comunidad}",
+            "time":      time_ago,
             "tags":      [f"#{t.nombre}" for t in r.tags],
             "rating":    r.rating,
             "votes":     r.votes     or 0,

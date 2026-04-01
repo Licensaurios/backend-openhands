@@ -42,6 +42,7 @@ class Recurso(db.Model):
     refs      = Column(JSONB,        nullable=True,  default=list)
     codelines = Column(JSONB,        nullable=True,  default=list)
     codelang  = Column(String(50),   nullable=True)
+    community_id = Column(UUID(as_uuid=True), ForeignKey("public.Comunidad.iD_cmnd"), nullable=False)
 
     tags     = relationship("Tag", secondary="public.recurso_tag", backref="recursos")
     imagenes = relationship('RecursoImg', backref='recurso', lazy=True, cascade="all, delete-orphan")

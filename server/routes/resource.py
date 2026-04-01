@@ -3,7 +3,7 @@ from flask import Blueprint
 from flask_security import auth_required
 
 from server.controllers.resource import create_resource, get_paginated_resources
-from server.controllers.resource import create_resource, get_paginated_resources, vote_resource
+from server.controllers.resource import vote_resource
 
 resource_router = Blueprint('resources', __name__, url_prefix='/resources')
 
@@ -30,7 +30,7 @@ def get_resources():
     return get_paginated_resources()
 
 @resource_router.route("/", methods=["POST"])
-@auth_required()
+# @auth_required()
 def post_resource():
     """
     Crear un nuevo recurso
@@ -76,6 +76,7 @@ def post_resource():
         description: No autorizado (Falta iniciar sesión)
     """
     return create_resource()
+
 @resource_router.route("/<uuid:recurso_id>/vote", methods=["PATCH"])
 @auth_required()
 def patch_vote(recurso_id):
