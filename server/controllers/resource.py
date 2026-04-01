@@ -192,16 +192,6 @@ def get_paginated_resources():
         time_ago = get_time_ago(seconds)
     
 
-        code = []
-        for line in r.codelines:
-            dic = {
-               'text': {
-                   'color': '#000',
-                   'text': line
-               },
-               'color': '#fff'
-            }
-            code.append(dic)
 
         resultado.append({
             "id":        str(r.ID_Rcrs),
@@ -214,7 +204,7 @@ def get_paginated_resources():
             "rating":    r.rating,
             "votes":     r.votes     or 0,
             "hasCode":   r.hascode   or False,
-            "codeLines": code or [],
+            "codeLines": r.codelines or [],
             "codeLang":  r.codelang,
             "markdown":  r.markdown,
             "refs":      r.refs      or [],
