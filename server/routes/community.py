@@ -23,7 +23,7 @@ from server.controllers.community import (
 
 )
 
-community_router = Blueprint('commun        ity', __name__, url_prefix='/api/community')
+community_router = Blueprint('community', __name__, url_prefix='/api/community')
 
 
 community_router.route('/my', methods=['GET'])(get_user_communities)

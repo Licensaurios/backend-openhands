@@ -111,7 +111,7 @@ def user_feed():
     ).order_by(desc(Publicacion.Fch_pblcn)).limit(30).all()
 
     return jsonify([format_post_output(p) for p in posts]), 200
-auth_required()
+@auth_required()
 def delete_post(post_id):
     post = Publicacion.query.get_or_404(post_id)
     if post.ID_Usr != current_user.id:
