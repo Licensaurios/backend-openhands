@@ -218,3 +218,41 @@ def get_paginated_resources():
         "per_page": per_page,
         "has_more": total > (page * per_page)
     }), 200
+
+def get_resource_by_id(resource_id):
+    r = Recurso.query.get(resource_id)
+    
+    if not r:
+        return jsonify({"error": "Recurso no encontrado"}), 404
+
+    usuario      = User.query.get(r.ID_Usr)
+    nombre_autor = usuario.nombre if (usuario and usuario.nombre) else "anonymous"
+
+    comunidad = Comunidad.query.get(r.community_id)
+    nombre_comunidad = comunidad.Name_cmnd if comunidad else "Global"
+
+    now      = datetime.now(timezone.utc)
+    diff     = now - r.Fch_plcn
+    seconds  = diff.total_seconds()
+    time_ago = get_time_ago(seconds)
+
+    resultado = {
+        "id":        str(r.ID_Rcrs),
+        "featured":  r.featured  or False,
+        "link":      r.Link or "",
+        "title":     r.title or r.Dscrpcn or "Untitled",
+        "author":    f"u/{nombre_autor}",
+        "community": f"c/{nombre_comunidad}",
+        "time":      time_ago,
+        "tags":      [f"#{t.nombre}" for t in r.tags],
+        "rating":    r.rating,
+        "votes":     r.votes     or 0,
+        "hasCode":   r.hascode   or False,
+        "codeLines": r.codelines or [],
+        "codeLang":  r.codelang,
+        "markdown":  r.markdown,
+        "refs":      r.refs      or [],
+        "images":    [img.url for img in r.imagenes],
+    }
+
+    return jsonify(resultado), 200

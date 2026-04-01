@@ -7,21 +7,21 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_security import Security, SQLAlchemyUserDatastore
 from flasgger import Swagger
 from dotenv import load_dotenv
-from flask_socketio import SocketIO 
 # 1. IMPORTACIONES DE TU PROYECTO
 from server.db.model import Role, User, db
 from server.extensiones import mail
+from server.extensiones import socketio
 from server.routes.auth import auth_router
 from server.routes.health import health_router
 from server.routes.resource import resource_router
 from server.routes.community import community_router
+from server.routes.chat import chat_router
 from server.sockets.events import register_chat_events 
 
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
 load_dotenv()
-socketio = SocketIO()
 swagger_config = {
     "headers": [],
     "specs": [
@@ -79,12 +79,21 @@ def init_webapp(config_path: str, test: bool = False) -> Flask:
     app.register_blueprint(health_router)
     app.register_blueprint(resource_router)
     app.register_blueprint(community_router) 
+    app.register_blueprint(chat_router) 
     user_datastore = SQLAlchemyUserDatastore(db, User, Role)
     Security(app, user_datastore)
+    app.config['SECURITY_EXEMPT_METHODS'] = {'OPTIONS'}
 
     with app.app_context():
         uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
         if "postgresql" in uri or "postgres" in uri:
+            db.create_all()
             log.info("Sincronizando modelos de OpenHands con Supabase...")
 
     return app
+
+
+def start_server():
+    app = init_webapp('./config/dev.config')
+    socketio.run(app, debug=True, port=5000, host="0.0.0.0", use_reloader=True)
+# __all__ = ["init_webapp", "socketio"]

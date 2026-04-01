@@ -3,7 +3,7 @@ from flask import Blueprint
 from flask_security import auth_required
 
 from server.controllers.resource import create_resource, get_paginated_resources
-from server.controllers.resource import vote_resource
+from server.controllers.resource import vote_resource, get_resource_by_id
 
 resource_router = Blueprint('resources', __name__, url_prefix='/resources')
 
@@ -28,6 +28,10 @@ def get_resources():
         description: Lista paginada de recursos formateada para el Frontend
     """
     return get_paginated_resources()
+
+@resource_router.route("/<resource_id>") 
+def resource_by_id(resource_id):
+    return get_resource_by_id(resource_id)
 
 @resource_router.route("/", methods=["POST"])
 # @auth_required()
