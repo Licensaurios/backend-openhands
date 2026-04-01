@@ -1,7 +1,9 @@
+#routes/resource
 from flask import Blueprint
 from flask_security import auth_required
 
 from server.controllers.resource import create_resource, get_paginated_resources
+from server.controllers.resource import vote_resource
 
 resource_router = Blueprint('resources', __name__, url_prefix='/resources')
 
@@ -28,7 +30,7 @@ def get_resources():
     return get_paginated_resources()
 
 @resource_router.route("/", methods=["POST"])
-@auth_required()
+# @auth_required()
 def post_resource():
     """
     Crear un nuevo recurso
@@ -46,9 +48,15 @@ def post_resource():
             link:
               type: string
               description: URL del recurso
+            title:
+              type: string
+              description: Título del recurso
             descripcion:
               type: string
-              description: Breve descripción
+              description: Breve descripción (opcional)
+            markdown:
+              type: boolean
+              description: Indica si el recurso usa formato markdown
             tags:
               type: array
               items:
@@ -68,3 +76,37 @@ def post_resource():
         description: No autorizado (Falta iniciar sesión)
     """
     return create_resource()
+
+@resource_router.route("/<uuid:recurso_id>/vote", methods=["PATCH"])
+@auth_required()
+def patch_vote(recurso_id):
+    """
+    Sumar o restar un voto a un recurso
+    ---
+    tags:
+      - Recursos
+    parameters:
+      - name: recurso_id
+        in: path
+        type: string
+        required: true
+        description: UUID del recurso
+      - in: body
+        name: body
+        schema:
+          type: object
+          required:
+            - value
+          properties:
+            value:
+              type: integer
+              description: 1 para upvote, -1 para downvote
+    responses:
+      200:
+        description: Voto registrado, retorna el nuevo conteo
+      400:
+        description: Valor inválido
+      404:
+        description: Recurso no encontrado
+    """
+    return vote_resource(recurso_id)

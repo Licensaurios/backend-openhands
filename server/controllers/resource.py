@@ -1,16 +1,39 @@
 import uuid
-import datetime
+from datetime import datetime, timezone
 import logging
 from flask import request, jsonify
 from flask_security import current_user
 from server.db.model import db, User
 from server.db.resource import Recurso, Recurso_Tag, RecursoImg
-from server.db.community import Tag
+from server.db.community import Tag, Comunidad
 
 log = logging.getLogger(__name__)
 
+def is_valid_uuid(uuid_to_test):
+    """
+    Check if uuid_to_test is a valid UUID.
+    """
+    try:
+        uuid.UUID(uuid_to_test)
+        return True
+    except ValueError:
+        return False
+
+def get_time_ago(seconds):
+    seconds = int(seconds)
+    if seconds < 60:
+        return f"{seconds}s ago"
+    elif seconds < 3600:
+        return f"{seconds // 60}m ago"
+    elif seconds < 86400:
+        return f"{seconds // 3600}h ago"
+    elif seconds < 2592000:
+        return f"{seconds // 86400}d ago"
+    else:
+        return f"{seconds // 2592000}mo ago"
+
+
 def _handle_resource_tags(recurso_id, tags_list):
-    """Maneja la asignación de tags al recurso (Relación Muchos a Muchos)."""
     if not tags_list:
         return
 
@@ -26,46 +49,82 @@ def _handle_resource_tags(recurso_id, tags_list):
         relacion = Recurso_Tag(ID_Rcrs=recurso_id, id=tag_obj.id)
         db.session.add(relacion)
 
-# --- ENDPOINT: CREAR RECURSO ---
+
 def create_resource():
     data = request.get_json()
-    link = data.get('link')
-    descripcion = data.get('descripcion')
-    tags_recibidos = data.get('tags', [])
-    imagenes_recibidas = data.get('images', [])  # Extraemos las URLs de imágenes
+
+    link               = data.get('link')
+    descripcion        = data.get('descripcion')
+    tags_recibidos     = data.get('tags', [])
+    imagenes_recibidas = data.get('images', [])
+    title              = data.get('title')
+    is_markdown        = data.get('markdown', False)
+    is_featured        = data.get('featured', False)
+    rating             = data.get('rating', None)
+    votes              = data.get('votes', 0)
+    has_code           = data.get('hasCode', False)
+    refs               = data.get('refs', [])
+    code_lines         = data.get('codeLines', [])
+    code_lang          = data.get('codeLang', None)
+    usuario_id         = data.get('user_id', None) 
 
     if not link:
         return jsonify({"error": "El link es obligatorio"}), 400
 
-    usuario_id_real = current_user.id
+    # usuario_id_real = current_user.id
+    if not title:
+        return jsonify({"error": "El titulo es obligatorio"}), 400
+
+    if not usuario_id:
+        return jsonify({"error": "El user_id es obligatorio"}), 400
+ 
+    if not is_valid_uuid(usuario_id):
+        return jsonify({"error": "El id del usuario es invalido"}), 400
+
+       # usuario_id_real = 
+
+    user_exists = db.session.query(
+        db.session.query(User).filter(User.id == usuario_id).exists()
+    ).scalar() 
+
+    if not user_exists:
+        msg = f"El usuario con el id {usuario_id} no existe!"
+        return jsonify({"error": msg }) 
+
     recurso_id = uuid.uuid4()
 
     nuevo_recurso = Recurso(
-        ID_Rcrs=recurso_id,
-        Link=link,
-        Dscrpcn=descripcion,
-        ID_Usr=usuario_id_real,
-        Fch_plcn=datetime.datetime.now(datetime.timezone.utc)
+        ID_Rcrs   = recurso_id,
+        Link      = link,
+        Dscrpcn   = descripcion,
+        title     = title,
+        markdown  = is_markdown,
+        ID_Usr    = usuario_id,
+        Fch_plcn  = datetime.now(datetime.timezone.utc),
+        featured  = is_featured,
+        rating    = rating,
+        votes     = votes,
+        hascode   = has_code,
+        refs      = refs,
+        codelines = code_lines,
+        codelang  = code_lang,
     )
 
     try:
         db.session.add(nuevo_recurso)
-        db.session.flush() # Sincroniza para usar el recurso_id en las imágenes
+        db.session.flush()
 
-        # Procesamos etiquetas
         _handle_resource_tags(recurso_id, tags_recibidos)
 
-        # Procesamos y guardamos las imágenes
         for img_url in imagenes_recibidas:
-            nueva_imagen = RecursoImg(url=img_url, ID_Rcrs=recurso_id)
-            db.session.add(nueva_imagen)
+            db.session.add(RecursoImg(url=img_url, ID_Rcrs=recurso_id))
 
         db.session.commit()
 
         return jsonify({
             "msg": "Recurso creado exitosamente",
             "id": str(recurso_id),
-            "usuario_asignado": str(usuario_id_real)
+            "usuario_asignado": str(usuario_id)
         }), 201
 
     except Exception as e:
@@ -74,13 +133,35 @@ def create_resource():
         return jsonify({"error": f"Error interno en base de datos: {str(e)}"}), 500
 
 
-# --- ENDPOINT: LISTAR Y FILTRAR RECURSOS ---
-def get_paginated_resources():
-    page = int(request.args.get('page', 1))
-    per_page = 10
-    tags_param = request.args.get('tags', '')
+def vote_resource(recurso_id):
+    data      = request.get_json()
+    value     = data.get('value')  # Solo acepta 1 o -1
 
-    query = Recurso.query
+    if value not in (1, -1):
+        return jsonify({"error": "El valor debe ser 1 o -1"}), 400
+
+    recurso = Recurso.query.get(recurso_id)
+    if not recurso:
+        return jsonify({"error": "Recurso no encontrado"}), 404
+
+    recurso.votes = (recurso.votes or 0) + value
+
+    try:
+        db.session.commit()
+        return jsonify({
+            "msg": "Voto registrado",
+            "votes": recurso.votes
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        log.error(f"Error al votar: {e}")
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
+def get_paginated_resources():
+    page       = int(request.args.get('page', 1))
+    per_page   = 10
+    tags_param = request.args.get('tags', '')
+    query      = Recurso.query
 
     if tags_param:
         tags_list = [t.strip().lower() for t in tags_param.split(',') if t.strip()]
@@ -89,40 +170,45 @@ def get_paginated_resources():
                 Tag.nombre.in_(tags_list)
             ).distinct()
 
-    query = query.order_by(Recurso.Fch_plcn.desc())
-
-    total = query.count()
+    query    = query.order_by(Recurso.Fch_plcn.desc())
+    total    = query.count()
     recursos = query.limit(per_page).offset((page - 1) * per_page).all()
 
     resultado = []
     for r in recursos:
-        # 1. Buscamos al usuario usando el ID (mapeado como 'id' en tu clase)
-        usuario = User.query.get(r.ID_Usr)
-
-        # 2. Usamos el atributo 'nombre' que es el que tienes definido en el código
+        usuario      = User.query.get(r.ID_Usr)
         nombre_autor = usuario.nombre if (usuario and usuario.nombre) else "anonymous"
 
-        # 3. Construcción del JSON con la estructura exacta de la imagen
+        comunidad = Comunidad.query.get(r.community_id)
+        nombre_comunidad = comunidad.Name_cmnd
+        
+        now = datetime.now(timezone.utc)
+        diff = now - r.Fch_plcn  # timedelta
+        seconds = diff.total_seconds()
+        time_ago = get_time_ago(seconds)
+    
         resultado.append({
-            "id": str(r.ID_Rcrs),
-            "featured": False,
-            "title": r.Dscrpcn or "Untitled",
-            "author": f"u/{nombre_autor}",  # Formato u/nombre
-            "community": "d/React Hub",  # Formato d/comunidad
-            "time": "1h ago",
-            "tags": [f"#{t.nombre}" for t in r.tags],
-            "rating": None,
-            "votes": 87,
-            "comments": 15,
-            "hasCode": False,
-            "refs": [],
-            "images": [img.url for img in r.imagenes]
+            "id":        str(r.ID_Rcrs),
+            "featured":  r.featured  or False,
+            "title":     r.title or r.Dscrpcn or "Untitled",
+            "author":    f"u/{nombre_autor}",
+            "community": f"c/{nombre_comunidad}",
+            "time":      time_ago,
+            "tags":      [f"#{t.nombre}" for t in r.tags],
+            "rating":    r.rating,
+            "votes":     r.votes     or 0,
+            "hasCode":   r.hascode   or False,
+            "codeLines": r.codelines or [],
+            "codeLang":  r.codelang,
+            "markdown":  r.markdown,
+            "refs":      r.refs      or [],
+            "images":    [img.url for img in r.imagenes],
         })
 
     return jsonify({
-        "items": resultado,
-        "total": total,
-        "page": page,
+        "items":    resultado,
+        "total":    total,
+        "page":     page,
         "per_page": per_page,
         "has_more": total > (page * per_page)
     }), 200
