@@ -100,7 +100,7 @@ def create_resource():
         title     = title,
         markdown  = is_markdown,
         ID_Usr    = usuario_id,
-        Fch_plcn  = datetime.now(datetime.timezone.utc),
+        Fch_plcn  = datetime.now(timezone.utc),
         featured  = is_featured,
         rating    = rating,
         votes     = votes,
@@ -180,8 +180,12 @@ def get_paginated_resources():
         nombre_autor = usuario.nombre if (usuario and usuario.nombre) else "anonymous"
 
         comunidad = Comunidad.query.get(r.community_id)
-        nombre_comunidad = comunidad.Name_cmnd
-        
+
+        if comunidad:
+            nombre_comunidad = comunidad.Name_cmnd
+        else:
+            nombre_comunidad = "Global"
+
         now = datetime.now(timezone.utc)
         diff = now - r.Fch_plcn  # timedelta
         seconds = diff.total_seconds()
