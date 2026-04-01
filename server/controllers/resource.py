@@ -228,7 +228,10 @@ def get_resource_by_id(resource_id):
     usuario      = User.query.get(r.ID_Usr)
     nombre_autor = usuario.nombre if (usuario and usuario.nombre) else "anonymous"
 
-    comunidad = Comunidad.query.get(r.community_id)
+    comunidad = None
+    if r.community_id:
+        comunidad = Comunidad.query.get(r.community_id)
+
     nombre_comunidad = comunidad.Name_cmnd if comunidad else "Global"
 
     now      = datetime.now(timezone.utc)
@@ -244,7 +247,7 @@ def get_resource_by_id(resource_id):
         "author":    f"u/{nombre_autor}",
         "community": f"c/{nombre_comunidad}",
         "time":      time_ago,
-        "tags":      [f"#{t.nombre}" for t in r.tags],
+        "tags":      [f"{t.nombre}" for t in r.tags],
         "rating":    r.rating,
         "votes":     r.votes     or 0,
         "hasCode":   r.hascode   or False,
