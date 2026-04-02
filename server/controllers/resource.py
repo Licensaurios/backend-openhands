@@ -242,6 +242,7 @@ def get_resource_by_id(resource_id):
     resultado = {
         "id":        str(r.ID_Rcrs),
         "featured":  r.featured  or False,
+        "descripcion":  r.Dscrpcn or "",
         "link":      r.Link or "",
         "title":     r.title or r.Dscrpcn or "Untitled",
         "author":    f"u/{nombre_autor}",
