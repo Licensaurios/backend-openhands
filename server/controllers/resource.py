@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timezone
+from sqlalchemy import or_
 import logging
 from flask import request, jsonify
 from flask_security import current_user
@@ -161,7 +162,9 @@ def get_paginated_resources():
     page       = int(request.args.get('page', 1))
     per_page   = 10
     tags_param = request.args.get('tags', '')
+    q = request.args.get('q', '')
     query      = Recurso.query
+
 
     if tags_param:
         tags_list = [t.strip().lower() for t in tags_param.split(',') if t.strip()]
@@ -169,10 +172,19 @@ def get_paginated_resources():
             query = query.join(Recurso_Tag).join(Tag).filter(
                 Tag.nombre.in_(tags_list)
             ).distinct()
-
-    query    = query.order_by(Recurso.Fch_plcn.desc())
-    total    = query.count()
-    recursos = query.limit(per_page).offset((page - 1) * per_page).all()
+    
+    if q is None:  
+        query    = query.order_by(Recurso.Fch_plcn.desc())
+        total    = query.count()
+        recursos = query.limit(per_page).offset((page - 1) * per_page).all()
+    else: 
+        search   = f"%{q}%"
+        query    = query.filter(or_(
+            Recurso.title.ilike(search),
+            Recurso.Dscrpcn.ilike(search)
+        )).order_by(Recurso.Fch_plcn.desc())
+        total    = query.count()
+        recursos = query.limit(per_page).offset((page - 1) * per_page).all()
 
     resultado = []
     for r in recursos:
